@@ -1,0 +1,117 @@
+// CloudEmu Worker Agent gRPC 服务定义
+// WorkerAgent 运行在每个 Worker 节点上，供 Control Plane 远程调用
+// 负责：创建 LiveKit 房间 + 生成 Token + 管理 EmuRunner 子进程生命周期
+
+syntax = "proto3";
+
+package cloudemu.worker;
+
+option go_package = "github.com/StellarisJAY/cloudemu/internal/proto/worker;workerpb";
+
+// WorkerAgent Worker 节点 gRPC 服务
+// Control Plane 作为客户端调用此服务来管理游戏会话
+service WorkerAgent {
+  // StartGame 启动游戏会话
+  // Worker 收到请求后：创建 LiveKit 房间 → 生成 access token → 启动 EmuRunner 子进程
+  rpc StartGame(StartGameRequest) returns (StartGameResponse);
+
+  // StopGame 停止游戏会话
+  // Worker 收到请求后：SIGTERM → 5s 超时 → SIGKILL EmuRunner 子进程 → 清理 LiveKit 房间
+  rpc StopGame(StopGameRequest) returns (StopGameResponse);
+
+  // SessionStatus 查询游戏会话运行状态
+  rpc SessionStatus(SessionStatusRequest) returns (SessionStatusResponse);
+
+  // GeneratePlayerToken 为指定玩家生成独立的 LiveKit token（identity="player:{user_id}"）
+  // 玩家通过此 token 加入 LiveKit 房间，与 EmuRunner 的 identity 不冲突
+  rpc GeneratePlayerToken(GeneratePlayerTokenRequest) returns (GeneratePlayerTokenResponse);
+
+  // UpdatePortMapping 更新房间的 port → player_identity 映射
+  // 房主调用 AssignPort 后由 Control Plane 触发，Worker 通过 LiveKit SendData 广播到房间
+  // EmuRunner 收到 control topic 包后更新 InputManager 的端口绑定
+  rpc UpdatePortMapping(UpdatePortMappingRequest) returns (UpdatePortMappingResponse);
+
+  // PauseGame 暂停游戏模拟器运行
+  // 房主调用，Worker 通过 LiveKit DataChannel (topic="control", type=0x05) 发送暂停指令到 EmuRunner
+  rpc PauseGame(PauseGameRequest) returns (PauseGameResponse);
+
+  // ResumeGame 继续游戏模拟器运行
+  // 房主调用，Worker 通过 LiveKit DataChannel (topic="control", type=0x06) 发送继续指令到 EmuRunner
+  rpc ResumeGame(ResumeGameRequest) returns (ResumeGameResponse);
+}
+
+// StartGameRequest 启动游戏会话请求
+message StartGameRequest {
+  string room_id = 1;        // 房间 ID（UUIDv7 字符串），同时也是 LiveKit 房间名
+  string rom_path = 2;       // MinIO 中的 ROM 文件路径（仅供日志/调试）
+  string emulator_type = 3;  // 模拟器类型："nes" / "gba" / "dos"
+  int32 max_ports = 4;       // 最大手柄端口数（最多4人），决定 DataChannel 数量
+  string rom_url = 5;        // MinIO 预签名下载 URL，Worker 用于下载 ROM 文件到本地临时目录
+  string host_user_id = 6;   // 房主用户 ID，Worker 据此生成房主的独立 player token
+}
+
+// StartGameResponse 启动游戏会话响应
+message StartGameResponse {
+  string livekit_token = 1;  // EmuRunner token（identity="emurunner", canPublish=true）
+  string livekit_room = 2;   // LiveKit 房间名（= room_id）
+  string livekit_url = 3;    // LiveKit 服务端 WebSocket 地址，前端/EmuRunner 用此地址连接
+  string host_token = 4;     // 房主玩家 token（identity="player:{host_id}", canPublish=false）
+}
+
+// StopGameRequest 停止游戏会话请求
+message StopGameRequest {
+  string room_id = 1;        // 要停止的房间 ID
+}
+
+// StopGameResponse 停止游戏会话响应（空消息）
+message StopGameResponse {}
+
+// SessionStatusRequest 查询会话状态请求
+message SessionStatusRequest {
+  string room_id = 1;        // 房间 ID
+}
+
+// SessionStatusResponse 会话状态响应
+message SessionStatusResponse {
+  string room_id = 1;        // 房间 ID
+  string status = 2;         // 会话状态："running" | "stopped" | "crashed"
+  int64 uptime_seconds = 3;  // 运行时长（秒），仅在 status=running 时有意义
+}
+
+// GeneratePlayerTokenRequest 为玩家生成独立 token 请求
+message GeneratePlayerTokenRequest {
+  string room_id = 1;        // 房间 ID
+  string user_id = 2;        // 玩家用户 ID，用于构造 identity="player:{user_id}"
+}
+
+// GeneratePlayerTokenResponse 生成玩家 token 响应
+message GeneratePlayerTokenResponse {
+  string token = 1;          // 玩家专属的 LiveKit access token
+}
+
+// UpdatePortMappingRequest 更新 port → player_identity 映射请求
+// mapping 是当前房间所有 role=1 且 port!=null 的玩家集合（全量）
+// key = port 编号（0-based），value = LiveKit identity（格式 "player:{user_id}"）
+message UpdatePortMappingRequest {
+  string room_id = 1;                 // 房间 ID
+  map<int32, string> mapping = 2;     // port → player identity 全量映射
+}
+
+// UpdatePortMappingResponse 更新映射响应（空消息）
+message UpdatePortMappingResponse {}
+
+// PauseGameRequest 暂停游戏请求
+message PauseGameRequest {
+  string room_id = 1;        // 房间 ID
+}
+
+// PauseGameResponse 暂停游戏响应（空消息）
+message PauseGameResponse {}
+
+// ResumeGameRequest 继续游戏请求
+message ResumeGameRequest {
+  string room_id = 1;        // 房间 ID
+}
+
+// ResumeGameResponse 继续游戏响应（空消息）
+message ResumeGameResponse {}
