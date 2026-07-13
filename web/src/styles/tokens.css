@@ -1,0 +1,157 @@
+/* ================================================================
+   CloudEmu 设计令牌 — CSS 自定义属性
+   亮色主题（默认） + 暗色主题（[data-theme="dark"]）
+   ================================================================ */
+
+/* ── 全局重置 ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* ── 亮色主题：晨光卡带 Morning Cartridge ── */
+:root {
+  /* 背景层级 */
+  --color-bg-primary: #f2f4f8;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f8f9fb;
+  --color-bg-input: #eef0f5;
+  --color-bg-hover: #e3e6ed;
+  --color-bg-pressed: #d7dbe5;
+  --color-bg-code: #f0f1f5;
+  --color-bg-tag: #e8ecf2;
+  --color-bg-avatar: #d9dee6;
+
+  /* 文字层级 */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-text-tertiary: #cbd5e1;
+  --color-text-disabled: #cbd5e1;
+  --color-text-placeholder: #94a3b8;
+  --color-text-base: #334155;
+
+  /* 功能色 */
+  --color-accent: #0284c7;
+  --color-accent-hover: #0369a1;
+  --color-accent-pressed: #075985;
+  --color-accent-suppl: #38bdf8;
+  --color-success: #16a34a;
+  --color-success-hover: #15803d;
+  --color-success-pressed: #166534;
+  --color-success-suppl: #4ade80;
+  --color-warning: #d97706;
+  --color-warning-hover: #b45309;
+  --color-warning-pressed: #92400e;
+  --color-warning-suppl: #fbbf24;
+  --color-error: #dc2626;
+  --color-error-hover: #b91c1c;
+  --color-error-pressed: #991b1b;
+  --color-error-suppl: #f87171;
+  --color-info: #0ea5e9;
+  --color-info-hover: #0284c7;
+  --color-info-pressed: #0369a1;
+  --color-info-suppl: #7dd3fc;
+
+  /* 边框与分隔 */
+  --color-border: #d4d9e1;
+  --color-divider: #e5e9f0;
+
+  /* 图标 */
+  --color-icon: #64748b;
+  --color-icon-hover: #334155;
+  --color-icon-pressed: #0f172a;
+  --color-icon-disabled: #cbd5e1;
+
+  /* 滚动条 */
+  --color-scrollbar: #cbd5e1;
+  --color-scrollbar-hover: #94a3b8;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+
+  /* 基础圆角 */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* 字号（1:1 映射 Naive UI token） */
+  --font-size-mini: 12px;
+  --font-size-tiny: 12px;
+  --font-size-small: 14px;
+  --font-size-medium: 16px;
+  --font-size-large: 18px;
+  --font-size-huge: 20px;
+}
+
+/* ── 暗色主题：午夜街机 Midnight Arcade ── */
+[data-theme='dark'] {
+  /* 背景层级 */
+  --color-bg-primary: #0f1419;
+  --color-bg-secondary: #1a2232;
+  --color-bg-tertiary: #161d28;
+  --color-bg-input: #212a3b;
+  --color-bg-hover: #263040;
+  --color-bg-pressed: #1e2838;
+  --color-bg-code: #161d28;
+  --color-bg-tag: #1e2a3c;
+  --color-bg-avatar: #2a3344;
+
+  /* 文字层级 */
+  --color-text-primary: #e8edf4;
+  --color-text-secondary: #8b9bb4;
+  --color-text-tertiary: #556278;
+  --color-text-disabled: #556278;
+  --color-text-placeholder: #556278;
+  --color-text-base: #c8d6e5;
+
+  /* 功能色 */
+  --color-accent: #4fc3f7;
+  --color-accent-hover: #81d4fa;
+  --color-accent-pressed: #29b6f6;
+  --color-accent-suppl: #29b6f6;
+  --color-success: #4ade80;
+  --color-success-hover: #22c55e;
+  --color-success-pressed: #16a34a;
+  --color-success-suppl: #86efac;
+  --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
+  --color-warning-pressed: #b45309;
+  --color-warning-suppl: #fbbf24;
+  --color-error: #ef4444;
+  --color-error-hover: #dc2626;
+  --color-error-pressed: #b91c1c;
+  --color-error-suppl: #f87171;
+  --color-info: #38bdf8;
+  --color-info-hover: #0ea5e9;
+  --color-info-pressed: #0284c7;
+  --color-info-suppl: #7dd3fc;
+
+  /* 边框与分隔 */
+  --color-border: #2a3344;
+  --color-divider: #1e2a3a;
+
+  /* 图标 */
+  --color-icon: #8b9bb4;
+  --color-icon-hover: #c8d6e5;
+  --color-icon-pressed: #e8edf4;
+  --color-icon-disabled: #556278;
+
+  /* 滚动条 */
+  --color-scrollbar: #2a3344;
+  --color-scrollbar-hover: #3a4558;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+}

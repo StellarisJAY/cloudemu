@@ -1,0 +1,161 @@
+/**
+ * Naive UI 主题覆盖 — 亮色 & 暗色两套
+ *
+ * 使用方式：
+ *   <n-config-provider :theme="isDark ? darkTheme : null"
+ *                      :theme-overrides="isDark ? darkThemeOverrides : lightThemeOverrides">
+ */
+
+import type { GlobalThemeOverrides } from 'naive-ui'
+
+/* ── 暗色主题覆盖：午夜街机 Midnight Arcade ── */
+export const darkThemeOverrides: GlobalThemeOverrides = {
+  common: {
+    primaryColor: '#4fc3f7',
+    primaryColorHover: '#81d4fa',
+    primaryColorPressed: '#29b6f6',
+    primaryColorSuppl: '#29b6f6',
+    infoColor: '#38bdf8',
+    infoColorHover: '#0ea5e9',
+    infoColorPressed: '#0284c7',
+    infoColorSuppl: '#7dd3fc',
+    successColor: '#4ade80',
+    successColorHover: '#22c55e',
+    successColorPressed: '#16a34a',
+    successColorSuppl: '#86efac',
+    warningColor: '#f59e0b',
+    warningColorHover: '#d97706',
+    warningColorPressed: '#b45309',
+    warningColorSuppl: '#fbbf24',
+    errorColor: '#ef4444',
+    errorColorHover: '#dc2626',
+    errorColorPressed: '#b91c1c',
+    errorColorSuppl: '#f87171',
+
+    textColorBase: '#c8d6e5',
+    textColor1: '#e8edf4',
+    textColor2: '#8b9bb4',
+    textColor3: '#556278',
+    textColorDisabled: '#556278',
+    placeholderColor: '#556278',
+    placeholderColorDisabled: '#3a4558',
+
+    iconColor: '#8b9bb4',
+    iconColorHover: '#c8d6e5',
+    iconColorPressed: '#e8edf4',
+    iconColorDisabled: '#556278',
+
+    dividerColor: '#1e2a3a',
+    borderColor: '#2a3344',
+    closeIconColor: '#8b9bb4',
+    closeIconColorHover: '#c8d6e5',
+    closeIconColorPressed: '#e8edf4',
+    closeColorHover: 'rgba(255, 255, 255, 0.08)',
+    closeColorPressed: 'rgba(255, 255, 255, 0.12)',
+
+    bodyColor: '#0f1419',
+    cardColor: '#1a2232',
+    modalColor: '#161d28',
+    popoverColor: '#1a2232',
+    tableColor: '#1a2232',
+    tableHeaderColor: '#1e2838',
+    tableColorHover: '#212a3b',
+    tableColorStriped: '#1e2838',
+    inputColor: '#212a3b',
+    inputColorDisabled: '#1a2232',
+    codeColor: '#161d28',
+    tabColor: '#1a2232',
+    actionColor: '#212a3b',
+    tagColor: '#1e2a3c',
+    avatarColor: '#2a3344',
+    hoverColor: '#263040',
+    pressedColor: '#1e2838',
+    buttonColor2: '#212a3b',
+    buttonColor2Hover: '#263040',
+    buttonColor2Pressed: '#1e2838',
+
+    scrollbarColor: '#2a3344',
+    scrollbarColorHover: '#3a4558',
+    progressRailColor: '#263040',
+    railColor: '#263040',
+
+    borderRadius: '6px',
+    borderRadiusSmall: '3px',
+  },
+}
+
+/* ── 亮色主题覆盖：晨光卡带 Morning Cartridge ── */
+export const lightThemeOverrides: GlobalThemeOverrides = {
+  common: {
+    primaryColor: '#0284c7',
+    primaryColorHover: '#0369a1',
+    primaryColorPressed: '#075985',
+    primaryColorSuppl: '#38bdf8',
+    infoColor: '#0ea5e9',
+    infoColorHover: '#0284c7',
+    infoColorPressed: '#0369a1',
+    infoColorSuppl: '#7dd3fc',
+    successColor: '#16a34a',
+    successColorHover: '#15803d',
+    successColorPressed: '#166534',
+    successColorSuppl: '#4ade80',
+    warningColor: '#d97706',
+    warningColorHover: '#b45309',
+    warningColorPressed: '#92400e',
+    warningColorSuppl: '#fbbf24',
+    errorColor: '#dc2626',
+    errorColorHover: '#b91c1c',
+    errorColorPressed: '#991b1b',
+    errorColorSuppl: '#f87171',
+
+    textColorBase: '#334155',
+    textColor1: '#0f172a',
+    textColor2: '#64748b',
+    textColor3: '#cbd5e1',
+    textColorDisabled: '#cbd5e1',
+    placeholderColor: '#94a3b8',
+    placeholderColorDisabled: '#cbd5e1',
+
+    iconColor: '#64748b',
+    iconColorHover: '#334155',
+    iconColorPressed: '#0f172a',
+    iconColorDisabled: '#cbd5e1',
+
+    dividerColor: '#e5e9f0',
+    borderColor: '#d4d9e1',
+    closeIconColor: '#64748b',
+    closeIconColorHover: '#334155',
+    closeIconColorPressed: '#0f172a',
+    closeColorHover: 'rgba(0, 0, 0, 0.05)',
+    closeColorPressed: 'rgba(0, 0, 0, 0.08)',
+
+    bodyColor: '#f2f4f8',
+    cardColor: '#ffffff',
+    modalColor: '#f8f9fb',
+    popoverColor: '#ffffff',
+    tableColor: '#ffffff',
+    tableHeaderColor: '#f2f4f8',
+    tableColorHover: '#f0f2f6',
+    tableColorStriped: '#f8f9fb',
+    inputColor: '#eef0f5',
+    inputColorDisabled: '#f2f4f8',
+    codeColor: '#f0f1f5',
+    tabColor: '#f2f4f8',
+    actionColor: '#eef0f5',
+    tagColor: '#e8ecf2',
+    avatarColor: '#d9dee6',
+    hoverColor: '#e3e6ed',
+    pressedColor: '#d7dbe5',
+    buttonColor2: '#eef0f5',
+    buttonColor2Hover: '#e3e6ed',
+    buttonColor2Pressed: '#d7dbe5',
+
+    scrollbarColor: '#cbd5e1',
+    scrollbarColorHover: '#94a3b8',
+    progressRailColor: '#e3e6ed',
+    railColor: '#e3e6ed',
+
+    borderRadius: '6px',
+    borderRadiusSmall: '3px',
+  },
+}
