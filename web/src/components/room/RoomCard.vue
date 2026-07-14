@@ -45,7 +45,7 @@ const statusLabels: Record<number, string> = {
 
 const emulatorCover: Record<EmulatorType, string> = {
   nes: '/assets/default-cover-nes.png',
-  gba: '/assets/default-cover-gba.png',
+  gb: '/assets/default-cover-gb.png',
   dos: '/assets/default-cover-dos.png',
 }
 </script>

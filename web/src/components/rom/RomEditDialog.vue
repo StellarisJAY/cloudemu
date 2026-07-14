@@ -35,7 +35,7 @@ watch(
 
 const emulatorLabels: Record<EmulatorType, string> = {
   nes: 'NES',
-  gba: 'GBC/GBA',
+  gb: 'GBC/GBA',
   dos: 'DOS',
 }
 
