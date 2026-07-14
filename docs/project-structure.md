@@ -88,7 +88,8 @@ cloudemu/
    │   │   ├── handler/                    # gin handler（薄层）
 │   │       │   ├── auth.go             # AuthHandler — 13 个认证接口
    │   │   │   ├── room.go                 # RoomHandler — 6 个房间接口
-   │   │   │   ├── rom.go                  # RomHandler — 上传 + 列表
+   │   │   │   ├── rom.go                  # RomHandler — 上传 + 列表 + 更新
+   │   │   │   ├── admin.go                # AdminHandler — 平台内置 ROM 管理（增删改查）
    │   │   │   ├── friend.go               # FriendHandler — 5 个好友接口
    │   │   │   └── files.go                # FileHandler — MinIO 文件代理
    │   │   │
@@ -150,20 +151,22 @@ cloudemu/
    │       │   ├── client.ts               # axios 实例 + 请求/响应拦截器（token 注入 + 401 自动刷新）
 │   │       ├── auth.ts                 # 认证 API（12 个端点：captcha, verifyCaptcha, register, verifyEmail, login, resendCode, refresh, me, updateProfile, updatePassword, forgotPassword, resetPassword）
    │       │   ├── room.ts                 # 房间 API（6 个端点）
-   │       │   ├── rom.ts                  # ROM API（2 个端点）
+   │       │   ├── rom.ts                  # ROM API（3 个端点：list, upload, update）
+   │       │   ├── admin.ts                # 管理员 API（4 个端点：listBuiltin, uploadBuiltin, updateBuiltin, deleteBuiltin）
    │       │   └── friend.ts               # 好友 API（6 个端点：list, pending, search, add, accept, reject）
    │       │
    │       ├── types/
-   │       │   └── api.ts                  # TypeScript 类型定义（与后端 DTO、Model 一一对应）
+   │       │   └── api.ts                  # TypeScript 类型定义（与后端 DTO、Model 一一对应；User.is_admin / Rom.is_builtin）
    │       │
    │       ├── utils/
    │       │   └── token.ts                # localStorage token 读写工具
    │       │
    │       ├── router/
-   │       │   └── index.ts                # 路由定义（4 条路由）+ 导航守卫（auth/guest meta）
+   │       │   └── index.ts                # 路由定义（含 /admin，admin meta 守卫查 is_admin）+ 导航守卫（auth/guest/admin meta）
    │       │
    │       ├── stores/                     # Pinia 状态管理
-   │       │   ├── auth.ts                 # useAuthStore — 用户信息、登录状态
+   │       │   ├── auth.ts                 # useAuthStore — 用户信息、登录状态、isAdmin getter
+   │       │   ├── admin.ts                # useAdminStore — 平台内置 ROM 管理状态
    │       │   └── friend.ts               # useFriendStore — 好友列表、待处理、搜索结果
    │       │
    │       ├── views/                      # 页面级组件
@@ -171,7 +174,8 @@ cloudemu/
    │       │   ├── RegisterView.vue         # 注册页（guest only）
    │       │   ├── ForgotPasswordView.vue    # 忘记密码页（guest only）
    │       │   ├── ResetPasswordView.vue     # 重置密码页（guest only）
-   │       │   ├── LobbyView.vue           # 大厅首页（需登录）
+   │       │   ├── LobbyView.vue           # 大厅首页（需登录，顶栏含管理员入口）
+   │       │   ├── AdminView.vue           # 管理后台（需管理员，平台内置 ROM 管理）
    │       │   └── ProfileView.vue         # 个人设置页（需登录）
    │       │
    │       ├── components/                 # 组件
@@ -265,9 +269,9 @@ handler ──→ contract  ←── service
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `RomService` | Upload, List | ROM 业务逻辑 |
-| `RomRepo` | Create, ByID, ByUploader, BySHA256 | ROM 表操作 |
-| `MinioFunc` | UploadFile, GetURL, GetFile | MinIO 文件操作 |
+| `RomService` | Upload, List, Update, UploadBuiltin, ListBuiltin, UpdateBuiltin, DeleteBuiltin | ROM 业务逻辑（含平台内置 ROM 管理） |
+| `RomRepo` | Create, Update, Delete, ByID, ListForUser, ListBuiltin, BySHA256, BuiltinBySHA256 | ROM 表操作 |
+| `MinioFunc` | UploadFile, GetURL, GetFile, RemoveFile | MinIO 文件操作 |
 
 ### contract/friend.go — 1 个接口
 
@@ -648,6 +652,7 @@ var ErrInvalidCode        = &AppError{1008, "验证码错误或已过期", 400}
 var ErrRefreshTokenExp    = &AppError{1009, "refresh token 无效或已过期", 401}
 var ErrUserNotFound       = &AppError{1010, "用户不存在", 404}
 var ErrCaptchaNotVerified = &AppError{1011, "验证码未验证", 401}
+var ErrForbiddenAdmin     = &AppError{1014, "需要管理员权限", 403}
 var ErrResetTokenInvalid = &AppError{1012, "重置链接无效或已过期", 400}
 var ErrResetTokenUsed    = &AppError{1013, "该重置链接已被使用", 400}
 
@@ -756,8 +761,18 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
             auth.POST("/rooms/leave",     h.Room.Leave)
 
             // ROM
-            auth.GET("/roms",             h.Rom.List)
+            auth.GET("/roms",             h.Rom.List)    // 返回：自有 ROM + 全部平台内置 ROM
             auth.POST("/roms/upload",     h.Rom.Upload)
+            auth.PUT("/roms/:id",         h.Rom.Update)   // 仅可改自有非内置 ROM
+
+            // 管理员：平台内置 ROM 管理（JWTAuth + AdminAuth 查库校验 is_admin）
+            admin := auth.Group("/admin", AdminAuth(userRepo))
+            {
+                admin.GET("/roms",        h.Admin.ListBuiltin)
+                admin.POST("/roms/upload", h.Admin.UploadBuiltin)
+                admin.PUT("/roms/:id",    h.Admin.UpdateBuiltin)
+                admin.DELETE("/roms/:id", h.Admin.DeleteBuiltin)
+            }
         }
 
         // 文件代理（公开）
@@ -770,6 +785,10 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
 ### JWT 中间件
 
 从 `Authorization: Bearer <token>` 提取 JWT，解析后将 `user_id` 和 `username` 注入 `gin.Context`。
+
+### AdminAuth 中间件
+
+`AdminAuth(userRepo)` 必须在 `JWTAuth` 之后使用：读取 `user_id`，查库校验 `users.is_admin`，非管理员返回 403（错误码 1014）。权限改动实时生效，无需重新登录（is_admin 不写入 JWT）。
 
 ---
 
@@ -834,11 +853,13 @@ func main() {
     friendSvc := service.NewFriendService(friendRepo, userRepo)
 
     handlers := &router.Handlers{
-        Auth:   handler.NewAuthHandler(authSvc),
-        Room:   handler.NewRoomHandler(roomSvc),
-        Rom:    handler.NewRomHandler(romSvc),
-        Friend: handler.NewFriendHandler(friendSvc),
-        Files:  handler.NewFileHandler(minioAdapter, cfg.MinioBucket),
+        Auth:     handler.NewAuthHandler(authSvc),
+        Room:     handler.NewRoomHandler(roomSvc),
+        Rom:      handler.NewRomHandler(romSvc),
+        Admin:    handler.NewAdminHandler(romSvc),   // 平台内置 ROM 管理，复用 RomService
+        Friend:   handler.NewFriendHandler(friendSvc),
+        Files:    handler.NewFileHandler(minioAdapter, cfg.MinioBucket),
+        UserRepo: userRepo,                          // 供 AdminAuth 中间件查库校验 is_admin
     }
 
     r := router.New(cfg, handlers)

@@ -33,6 +33,7 @@ var (
 	ErrCaptchaNotVerified  = &AppError{1011, "验证码未验证，请先完成安全验证", 400}
 	ErrResetTokenInvalid   = &AppError{1012, "重置链接无效或已过期", 400}
 	ErrResetTokenUsed      = &AppError{1013, "该重置链接已被使用", 400}
+	ErrForbiddenAdmin      = &AppError{1014, "需要管理员权限", 403}
 )
 
 // ---- 房间模块错误 (2001-2015) ----

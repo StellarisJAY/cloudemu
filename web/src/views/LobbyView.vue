@@ -112,7 +112,7 @@ function handleRoomClick(roomId: string) {
 
 function handleRomClick(romId: string) {
   const rom = romStore.roms.find((r) => r.id === romId)
-  if (rom) {
+  if (rom && !rom.is_builtin) {
     editingRom.value = rom
     showEditRom.value = true
   }
@@ -158,6 +158,9 @@ function handleRomEdited() {
         <span v-if="auth.user" class="header-user">
           {{ auth.user.nickname || auth.user.username }}
         </span>
+        <n-button v-if="auth.isAdmin" size="small" text @click="router.push('/admin')">
+          管理后台
+        </n-button>
         <n-button size="small" text @click="router.push('/profile')"> 设置 </n-button>
         <n-button size="small" text @click="auth.logout"> 退出 </n-button>
       </div>

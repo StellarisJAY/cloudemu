@@ -18,6 +18,7 @@ export interface User {
   avatar: string | null
   bio: string | null
   status: UserStatus
+  is_admin: boolean
   last_login_at: string | null
   created_at: string
   updated_at: string
@@ -109,6 +110,7 @@ export interface Rom {
   emulator_type: EmulatorType
   file_size: number
   cover_path: string | null
+  is_builtin: boolean
   created_at: string
 }
 

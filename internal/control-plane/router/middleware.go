@@ -3,9 +3,11 @@ package router
 import (
 	"strings"
 
+	"github.com/StellarisJAY/cloudemu/internal/control-plane/contract"
 	jwtutil "github.com/StellarisJAY/cloudemu/internal/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // JWTAuth JWT 认证中间件
@@ -35,6 +37,25 @@ func JWTAuth(secret []byte) gin.HandlerFunc {
 
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
+		c.Next()
+	}
+}
+
+// AdminAuth 管理员权限中间件
+// 必须在 JWTAuth 之后使用：读取 user_id，查库校验 users.is_admin
+// 非管理员返回 403（错误码 1014）。权限改动实时生效，无需重新登录
+func AdminAuth(userRepo contract.UserRepo) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.MustGet("user_id").(uuid.UUID)
+
+		user, err := userRepo.ByID(c.Request.Context(), userID)
+		if err != nil || user == nil || !user.IsAdmin {
+			c.AbortWithStatusJSON(403, map[string]interface{}{
+				"code":    1014,
+				"message": "需要管理员权限",
+			})
+			return
+		}
 		c.Next()
 	}
 }

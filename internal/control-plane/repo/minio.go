@@ -78,3 +78,8 @@ func (m *MinioAdapter) GetFile(ctx context.Context, bucket, path string) (io.Rea
 	}
 	return io.NopCloser(bytes.NewReader(buf.Bytes())), nil
 }
+
+// RemoveFile 删除指定桶和路径的文件（用于删除内置 ROM 文件与封面）
+func (m *MinioAdapter) RemoveFile(ctx context.Context, bucket, path string) error {
+	return m.cli.RemoveObject(ctx, bucket, path, minio.RemoveObjectOptions{})
+}

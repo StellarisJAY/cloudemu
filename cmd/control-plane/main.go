@@ -171,11 +171,13 @@ func main() {
 
 	// ---- 依赖注入：Handler 层 ----
 	handlers := &router.Handlers{
-		Auth:   handler.NewAuthHandler(authSvc),
-		Room:   handler.NewRoomHandler(roomSvc),
-		Rom:    handler.NewRomHandler(romSvc),
-		Friend: handler.NewFriendHandler(friendSvc),
-		Files:  handler.NewFileHandler(minioAdapter, cfg),
+		Auth:     handler.NewAuthHandler(authSvc),
+		Room:     handler.NewRoomHandler(roomSvc),
+		Rom:      handler.NewRomHandler(romSvc),
+		Admin:    handler.NewAdminHandler(romSvc),
+		Friend:   handler.NewFriendHandler(friendSvc),
+		Files:    handler.NewFileHandler(minioAdapter, cfg),
+		UserRepo: userRepo,
 	}
 
 	// 注册路由并启动服务

@@ -17,6 +17,7 @@ type Rom struct {
 	FileSize     int64     `gorm:"type:bigint;not null" json:"file_size"`                      // 文件大小（字节）
 	SHA256       string    `gorm:"type:varchar(64);not null;index" json:"-"`                   // 文件 SHA-256 哈希值（不暴露）
 	Status       int16     `gorm:"type:smallint;not null;default:0;index" json:"status"`       // ROM 状态：0=待审核, 1=已通过(可用), 2=已拒绝
+	IsBuiltin    bool      `gorm:"type:boolean;not null;default:false;index" json:"is_builtin"` // 是否为平台内置 ROM：true=管理员上传，全体用户可见可用、不可修改
 	MinioPath    string    `gorm:"type:varchar(512);not null" json:"-"`                        // MinIO 上的 ROM 文件存储路径（不暴露）
 	CoverPath    *string   `gorm:"type:varchar(512)" json:"cover_path,omitempty"`              // MinIO 上的封面图路径，NULL=无封面（前端用默认图）
 	CreatedAt    time.Time `gorm:"type:timestamptz;not null;autoCreateTime" json:"created_at"` // 上传时间

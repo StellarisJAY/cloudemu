@@ -34,6 +34,7 @@ CREATE TABLE users (
     avatar        VARCHAR(512),             -- 头像URL/路径，空时前端展示默认头像
     bio           VARCHAR(512),             -- 个人简介
     status        SMALLINT     NOT NULL DEFAULT 0,  -- 0:pending, 1:active, 2:disabled
+    is_admin      BOOLEAN      NOT NULL DEFAULT FALSE, -- 是否管理员，可上传/管理平台内置 ROM（手动改库授予）
     last_login_at TIMESTAMPTZ,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
@@ -42,6 +43,7 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX uk_users_username ON users (username);
 CREATE UNIQUE INDEX uk_users_email    ON users (email);
 CREATE INDEX        ix_users_status   ON users (status);
+CREATE INDEX        ix_users_is_admin ON users (is_admin);
 ```
 
 | 列 | 类型 | 说明 |
@@ -54,6 +56,7 @@ CREATE INDEX        ix_users_status   ON users (status);
 | avatar | VARCHAR(512) | 头像 URL/路径，NULL 时前端展示默认头像 |
 | bio | VARCHAR(512) | 个人简介 |
 | status | SMALLINT | 0=待激活, 1=已激活(可游戏), 2=已禁用 |
+| is_admin | BOOLEAN | 是否管理员，默认 false；管理员可上传/管理平台内置 ROM（手动 `UPDATE users SET is_admin=true` 授予，无提升接口） |
 | last_login_at | TIMESTAMPTZ | 最近一次登录时间 |
 | created_at | TIMESTAMPTZ | 注册时间 |
 | updated_at | TIMESTAMPTZ | 更新时间 |
@@ -462,6 +465,7 @@ CREATE TABLE roms (
     file_size     BIGINT       NOT NULL,
     sha256        VARCHAR(64)  NOT NULL,
     status        SMALLINT     NOT NULL DEFAULT 0, -- 0:pending, 1:approved, 2:rejected
+    is_builtin    BOOLEAN      NOT NULL DEFAULT FALSE, -- 是否平台内置 ROM：true=管理员上传，全体用户可见可用、不可修改
     minio_path    VARCHAR(512) NOT NULL,
     cover_path    VARCHAR(512),                    -- MinIO 封面图路径, NULL 则前端使用默认图
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -472,19 +476,25 @@ CREATE INDEX ix_roms_uploader ON roms (uploader_id);
 CREATE INDEX ix_roms_status   ON roms (status);
 CREATE INDEX ix_roms_emu      ON roms (emulator_type);
 CREATE INDEX ix_roms_sha256   ON roms (sha256);
+CREATE INDEX ix_roms_builtin  ON roms (is_builtin);
 ```
 
 | 列 | 类型 | 说明 |
 |----|------|------|
-| uploader_id | UUID | 上传者，**查询时强制过滤 `WHERE uploader_id=?`** |
-| sha256 | VARCHAR(64) | 文件去重（同一用户不可重复上传同一文件） |
-| minio_path | VARCHAR(512) | MinIO 上的 ROM 文件存储路径 |
+| uploader_id | UUID | 上传者；普通 ROM 查询强制 `WHERE uploader_id=?`，内置 ROM 记录上传的管理员 ID |
+| sha256 | VARCHAR(64) | 文件去重（普通 ROM 按同一用户去重；内置 ROM 全局去重） |
+| is_builtin | BOOLEAN | 是否平台内置 ROM，默认 false；true 时对全体用户可见可用，仅管理员可改/删 |
+| minio_path | VARCHAR(512) | MinIO 上的 ROM 文件存储路径（内置 ROM 用 `rom/builtin/{rom_id}.{ext}`） |
 | cover_path | VARCHAR(512) | MinIO 上的封面图路径，NULL 则前端按 emulator_type 显示默认图 |
 | status | SMALLINT | 0=待审核, 1=已通过(可用), 2=已拒绝 |
 
-> **ROM 隔离**: `roms` 没有全局唯一索引。即使两个用户上传了同一个文件（相同 sha256），也会存储为两条独立记录，各自通过 `uploader_id` 隔离。`sha256` 索引仅用于同一用户去重。
+> **ROM 可见性**: 用户 ROM 列表 = 自有非内置 ROM（`uploader_id=? AND is_builtin=false`）∪ 全部内置 ROM（`is_builtin=true`），两集合互斥无重复，均限 `status=1`。
 >
-> **封面图处理**: `cover_path` 为 NULL 时，前端根据 `emulator_type` 展示默认封面（如 NES 灰色卡带、GB 白色卡带图标、DOS 深绿色磁盘图标）。覆盖图由用户在 ROM 上传时选择文件一起提交，存储到 MinIO 的 `cover/{uploader_id}/{rom_id}.{ext}` 路径。
+> **ROM 隔离**: 普通 ROM 无全局唯一索引，两个用户上传相同文件各存一条，通过 `uploader_id` 隔离，`sha256` 仅用于同一用户去重；内置 ROM 则按 `sha256` 全局去重。
+>
+> **内置 ROM 管理**: 仅管理员（`users.is_admin=true`）可通过 `/api/admin/roms/**` 上传/改标题封面/删除内置 ROM；普通用户 `PUT /api/roms/:id` 命中内置 ROM 返回「ROM 不存在」（不泄露归属）。删除内置 ROM 同时移除 MinIO 的 ROM 文件与封面。
+>
+> **封面图处理**: `cover_path` 为 NULL 时，前端根据 `emulator_type` 展示默认封面（如 NES 灰色卡带、GB 白色卡带图标、DOS 深绿色磁盘图标）。覆盖图由用户在 ROM 上传时选择文件一起提交，存储到 MinIO 的 `cover/{uploader_id}/{rom_id}.{ext}`（内置 ROM 为 `rom/builtin/cover/{rom_id}.{ext}`）路径。
 
 ---
 

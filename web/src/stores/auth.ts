@@ -13,6 +13,9 @@ export const useAuthStore = defineStore('auth', () => {
   /** 是否已登录（有 user 对象且有 token） */
   const isLoggedIn = computed(() => user.value !== null && getAccessToken() !== null)
 
+  /** 是否为管理员（来自 /auth/me 的 is_admin） */
+  const isAdmin = computed(() => user.value?.is_admin === true)
+
   /** 从服务端获取当前用户信息 */
   async function fetchUser(): Promise<void> {
     try {
@@ -69,5 +72,5 @@ export const useAuthStore = defineStore('auth', () => {
     router.push('/login')
   }
 
-  return { user, isLoggedIn, fetchUser, login, updateProfile, updatePassword, logout }
+  return { user, isLoggedIn, isAdmin, fetchUser, login, updateProfile, updatePassword, logout }
 })

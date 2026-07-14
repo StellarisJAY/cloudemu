@@ -68,6 +68,7 @@ func (h *RomHandler) List(c *gin.Context) {
 		EmulatorType string  `json:"emulator_type"`
 		FileSize     int64   `json:"file_size"`
 		CoverPath    *string `json:"cover_path"`
+		IsBuiltin    bool    `json:"is_builtin"`
 		CreatedAt    string  `json:"created_at"`
 	}
 
@@ -79,6 +80,7 @@ func (h *RomHandler) List(c *gin.Context) {
 			EmulatorType: r.EmulatorType,
 			FileSize:     r.FileSize,
 			CoverPath:    r.CoverPath,
+			IsBuiltin:    r.IsBuiltin,
 			CreatedAt:    r.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}

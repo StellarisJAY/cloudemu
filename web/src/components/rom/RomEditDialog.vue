@@ -46,9 +46,10 @@ function coverUrl(coverPath: string | null): string {
 
 function handleCoverChange(e: Event) {
   const input = e.target as HTMLInputElement
-  if (input.files && input.files.length > 0) {
-    coverFile.value = input.files[0]
-    coverFileName.value = input.files[0].name
+  const f = input.files?.[0]
+  if (f) {
+    coverFile.value = f
+    coverFileName.value = f.name
   }
 }
 

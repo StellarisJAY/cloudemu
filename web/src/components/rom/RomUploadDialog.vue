@@ -34,17 +34,19 @@ const emulatorOptions = [
 
 function handleRomChange(e: Event) {
   const input = e.target as HTMLInputElement
-  if (input.files && input.files.length > 0) {
-    romFile.value = input.files[0]
-    romFileName.value = input.files[0].name
+  const f = input.files?.[0]
+  if (f) {
+    romFile.value = f
+    romFileName.value = f.name
   }
 }
 
 function handleCoverChange(e: Event) {
   const input = e.target as HTMLInputElement
-  if (input.files && input.files.length > 0) {
-    coverFile.value = input.files[0]
-    coverFileName.value = input.files[0].name
+  const f = input.files?.[0]
+  if (f) {
+    coverFile.value = f
+    coverFileName.value = f.name
   }
 }
 

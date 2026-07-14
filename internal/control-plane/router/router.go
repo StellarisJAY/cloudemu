@@ -3,6 +3,7 @@ package router
 import (
 	"log/slog"
 
+	"github.com/StellarisJAY/cloudemu/internal/control-plane/contract"
 	"github.com/StellarisJAY/cloudemu/internal/control-plane/handler"
 	"github.com/StellarisJAY/cloudemu/internal/pkg/config"
 	"github.com/StellarisJAY/cloudemu/internal/pkg/logging"
@@ -13,11 +14,13 @@ import (
 
 // Handlers 聚合所有 HTTP Handler，用于路由注册
 type Handlers struct {
-	Auth   *handler.AuthHandler
-	Room   *handler.RoomHandler
-	Rom    *handler.RomHandler
-	Friend *handler.FriendHandler
-	Files  *handler.FileHandler
+	Auth     *handler.AuthHandler
+	Room     *handler.RoomHandler
+	Rom      *handler.RomHandler
+	Admin    *handler.AdminHandler
+	Friend   *handler.FriendHandler
+	Files    *handler.FileHandler
+	UserRepo contract.UserRepo // 供 AdminAuth 中间件查库校验 is_admin
 }
 
 // New 创建 gin.Engine 并注册所有路由
@@ -99,6 +102,15 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
 			auth.GET("/roms", h.Rom.List)
 			auth.POST("/roms/upload", h.Rom.Upload)
 			auth.PUT("/roms/:id", h.Rom.Update)
+
+			// 管理员：平台内置 ROM 管理（JWTAuth + AdminAuth 查库校验）
+			admin := auth.Group("/admin", AdminAuth(h.UserRepo))
+			{
+				admin.GET("/roms", h.Admin.ListBuiltin)
+				admin.POST("/roms/upload", h.Admin.UploadBuiltin)
+				admin.PUT("/roms/:id", h.Admin.UpdateBuiltin)
+				admin.DELETE("/roms/:id", h.Admin.DeleteBuiltin)
+			}
 		}
 
 		// MinIO 文件代理

@@ -16,6 +16,7 @@ type User struct {
 	Avatar       *string    `gorm:"type:varchar(512)" json:"avatar,omitempty"`                  // 头像URL/路径，可为空（空时前端展示默认头像）
 	Bio          *string    `gorm:"type:varchar(512)" json:"bio,omitempty"`                     // 个人简介，可为空
 	Status       int16      `gorm:"type:smallint;not null;default:0;index" json:"status"`       // 账户状态：0=待激活, 1=已激活(可游戏), 2=已禁用
+	IsAdmin      bool       `gorm:"type:boolean;not null;default:false;index" json:"is_admin"`  // 是否为管理员，管理员可上传/管理平台内置 ROM（手动改库授予）
 	LastLoginAt  *time.Time `gorm:"type:timestamptz" json:"last_login_at,omitempty"`            // 最近一次登录时间
 	CreatedAt    time.Time  `gorm:"type:timestamptz;not null;autoCreateTime" json:"created_at"` // 注册时间
 	UpdatedAt    time.Time  `gorm:"type:timestamptz;not null;autoUpdateTime" json:"updated_at"` // 更新时间

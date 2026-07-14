@@ -49,6 +49,7 @@ function formatSize(bytes: number): string {
         class="cover-img"
       />
       <span class="card-emu-tag">{{ emulatorLabels[rom.emulator_type] }}</span>
+      <span v-if="rom.is_builtin" class="card-builtin-tag">平台内置</span>
     </div>
     <div class="card-info">
       <span class="card-rom-title">{{ rom.title }}</span>
@@ -105,6 +106,18 @@ function formatSize(bytes: number): string {
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.card-builtin-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
