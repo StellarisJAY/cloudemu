@@ -28,7 +28,7 @@ const submitting = ref(false)
 
 const emulatorOptions = [
   { label: 'NES', value: 'nes' as const },
-  { label: 'GBA', value: 'gba' as const },
+  { label: 'GBC/GBA', value: 'gb' as const },
   { label: 'DOS', value: 'dos' as const },
 ]
 
@@ -119,7 +119,7 @@ function resetForm() {
           <input
             ref="romFileInput"
             type="file"
-            accept=".nes,.gba"
+            accept=".nes,.gba,.gbc"
             style="display: none"
             @change="handleRomChange"
           />

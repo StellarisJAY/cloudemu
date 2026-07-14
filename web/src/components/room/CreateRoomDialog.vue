@@ -42,7 +42,7 @@ watch(
 
 const emulatorOptions = [
   { label: 'NES', value: 'nes' as const },
-  { label: 'GBA', value: 'gba' as const },
+  { label: 'GBC/GBA', value: 'gba' as const },
   { label: 'DOS', value: 'dos' as const },
 ]
 

@@ -33,7 +33,7 @@ function handleMenuSelect(key: string) {
 
 const emulatorLabels: Record<EmulatorType, string> = {
   nes: 'NES',
-  gba: 'GBA',
+  gb: 'GBC/GBA',
   dos: 'DOS',
 }
 

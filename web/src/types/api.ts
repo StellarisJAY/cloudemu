@@ -101,7 +101,7 @@ export interface ResetPasswordReq {
 export type RomStatus = 0 | 1 | 2
 
 /** 模拟器类型 */
-export type EmulatorType = 'nes' | 'gba' | 'dos'
+export type EmulatorType = 'nes' | 'gb' | 'dos'
 
 export interface Rom {
   id: string

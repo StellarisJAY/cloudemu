@@ -152,7 +152,9 @@ func detectEmulatorType(fileName string) string {
 	case ".nes":
 		return "nes"
 	case ".gba":
-		return "gba"
+		return "gb"
+	case ".gbc":
+		return "gb"
 	case ".zip":
 		return "dos"
 	default:
