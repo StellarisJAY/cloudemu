@@ -30,6 +30,8 @@ const (
 	WorkerAgent_UpdatePortMapping_FullMethodName   = "/cloudemu.worker.WorkerAgent/UpdatePortMapping"
 	WorkerAgent_PauseGame_FullMethodName           = "/cloudemu.worker.WorkerAgent/PauseGame"
 	WorkerAgent_ResumeGame_FullMethodName          = "/cloudemu.worker.WorkerAgent/ResumeGame"
+	WorkerAgent_SaveState_FullMethodName           = "/cloudemu.worker.WorkerAgent/SaveState"
+	WorkerAgent_LoadState_FullMethodName           = "/cloudemu.worker.WorkerAgent/LoadState"
 )
 
 // WorkerAgentClient is the client API for WorkerAgent service.
@@ -60,6 +62,14 @@ type WorkerAgentClient interface {
 	// ResumeGame 继续游戏模拟器运行
 	// 房主调用，Worker 通过 LiveKit DataChannel (topic="control", type=0x06) 发送继续指令到 EmuRunner
 	ResumeGame(ctx context.Context, in *ResumeGameRequest, opts ...grpc.CallOption) (*ResumeGameResponse, error)
+	// SaveState 保存游戏存档
+	// 房主调用：Worker 通过 control DataChannel (type=0x07) 令 EmuRunner 序列化到共享目录，
+	// 轮询到完成标志后读取状态二进制，用预签名 URL 上传到 MinIO
+	SaveState(ctx context.Context, in *SaveStateRequest, opts ...grpc.CallOption) (*SaveStateResponse, error)
+	// LoadState 读取游戏存档
+	// 房主调用：Worker 用预签名 URL 下载状态二进制到共享目录，通过 control DataChannel (type=0x08)
+	// 令 EmuRunner 反序列化恢复游戏进度
+	LoadState(ctx context.Context, in *LoadStateRequest, opts ...grpc.CallOption) (*LoadStateResponse, error)
 }
 
 type workerAgentClient struct {
@@ -140,6 +150,26 @@ func (c *workerAgentClient) ResumeGame(ctx context.Context, in *ResumeGameReques
 	return out, nil
 }
 
+func (c *workerAgentClient) SaveState(ctx context.Context, in *SaveStateRequest, opts ...grpc.CallOption) (*SaveStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveStateResponse)
+	err := c.cc.Invoke(ctx, WorkerAgent_SaveState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workerAgentClient) LoadState(ctx context.Context, in *LoadStateRequest, opts ...grpc.CallOption) (*LoadStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LoadStateResponse)
+	err := c.cc.Invoke(ctx, WorkerAgent_LoadState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkerAgentServer is the server API for WorkerAgent service.
 // All implementations must embed UnimplementedWorkerAgentServer
 // for forward compatibility.
@@ -168,6 +198,14 @@ type WorkerAgentServer interface {
 	// ResumeGame 继续游戏模拟器运行
 	// 房主调用，Worker 通过 LiveKit DataChannel (topic="control", type=0x06) 发送继续指令到 EmuRunner
 	ResumeGame(context.Context, *ResumeGameRequest) (*ResumeGameResponse, error)
+	// SaveState 保存游戏存档
+	// 房主调用：Worker 通过 control DataChannel (type=0x07) 令 EmuRunner 序列化到共享目录，
+	// 轮询到完成标志后读取状态二进制，用预签名 URL 上传到 MinIO
+	SaveState(context.Context, *SaveStateRequest) (*SaveStateResponse, error)
+	// LoadState 读取游戏存档
+	// 房主调用：Worker 用预签名 URL 下载状态二进制到共享目录，通过 control DataChannel (type=0x08)
+	// 令 EmuRunner 反序列化恢复游戏进度
+	LoadState(context.Context, *LoadStateRequest) (*LoadStateResponse, error)
 	mustEmbedUnimplementedWorkerAgentServer()
 }
 
@@ -198,6 +236,12 @@ func (UnimplementedWorkerAgentServer) PauseGame(context.Context, *PauseGameReque
 }
 func (UnimplementedWorkerAgentServer) ResumeGame(context.Context, *ResumeGameRequest) (*ResumeGameResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeGame not implemented")
+}
+func (UnimplementedWorkerAgentServer) SaveState(context.Context, *SaveStateRequest) (*SaveStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveState not implemented")
+}
+func (UnimplementedWorkerAgentServer) LoadState(context.Context, *LoadStateRequest) (*LoadStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LoadState not implemented")
 }
 func (UnimplementedWorkerAgentServer) mustEmbedUnimplementedWorkerAgentServer() {}
 func (UnimplementedWorkerAgentServer) testEmbeddedByValue()                     {}
@@ -346,6 +390,42 @@ func _WorkerAgent_ResumeGame_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkerAgent_SaveState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkerAgentServer).SaveState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkerAgent_SaveState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkerAgentServer).SaveState(ctx, req.(*SaveStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkerAgent_LoadState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LoadStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkerAgentServer).LoadState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkerAgent_LoadState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkerAgentServer).LoadState(ctx, req.(*LoadStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkerAgent_ServiceDesc is the grpc.ServiceDesc for WorkerAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +460,14 @@ var WorkerAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResumeGame",
 			Handler:    _WorkerAgent_ResumeGame_Handler,
+		},
+		{
+			MethodName: "SaveState",
+			Handler:    _WorkerAgent_SaveState_Handler,
+		},
+		{
+			MethodName: "LoadState",
+			Handler:    _WorkerAgent_LoadState_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

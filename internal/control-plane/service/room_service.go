@@ -24,6 +24,7 @@ type RoomService struct {
 	workerClient   contract.WorkerClient
 	minioFunc      contract.MinioFunc
 	bucket         string
+	saveStateRepo  contract.SaveStateRepo
 }
 
 // NewRoomService 创建 RoomService 实例
@@ -38,6 +39,7 @@ func NewRoomService(
 	workerClient contract.WorkerClient,
 	minioFunc contract.MinioFunc,
 	bucket string,
+	saveStateRepo contract.SaveStateRepo,
 ) *RoomService {
 	return &RoomService{
 		roomRepo:       roomRepo,
@@ -50,6 +52,7 @@ func NewRoomService(
 		workerClient:   workerClient,
 		minioFunc:      minioFunc,
 		bucket:         bucket,
+		saveStateRepo:  saveStateRepo,
 	}
 }
 
@@ -694,4 +697,138 @@ func (s *RoomService) Leave(ctx context.Context, userID uuid.UUID, roomID uuid.U
 	}
 
 	return nil
+}
+
+// saveStateMinioPath 构造存档在 MinIO 的存储路径
+func saveStateMinioPath(roomID, saveStateID uuid.UUID) string {
+	return "savestate/" + roomID.String() + "/" + saveStateID.String() + ".dat"
+}
+
+// SaveState 房主保存存档
+// 流程：校验房主 + 房间 playing + 已选 ROM → 生成存档 ID 与 MinIO 预签名 PUT URL →
+//
+//	gRPC 通知 Worker（令 EmuRunner 序列化并上传）→ 落库 save_states 记录
+func (s *RoomService) SaveState(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) (*model.SaveState, error) {
+	room, err := s.roomRepo.ByID(ctx, roomID)
+	if err != nil || room == nil {
+		return nil, apperror.ErrRoomNotExist
+	}
+	if room.HostID != hostID {
+		return nil, apperror.ErrNotRoomHost
+	}
+	if room.Status != 1 {
+		return nil, apperror.ErrRoomNotPlaying
+	}
+	if room.RomID == nil {
+		return nil, apperror.ErrRomNotSelected
+	}
+	if room.WorkerAddr == "" {
+		return nil, apperror.ErrWorkerUnavailable
+	}
+
+	saveStateID := uuid.Must(uuid.NewV7())
+	minioPath := saveStateMinioPath(roomID, saveStateID)
+
+	// 生成预签名 PUT URL，Worker 用它上传状态二进制
+	uploadURL, err := s.minioFunc.PresignedPutURL(ctx, s.bucket, minioPath, 5*time.Minute)
+	if err != nil {
+		slog.Error("failed to generate presigned put url", "room_id", roomID, "error", err)
+		return nil, apperror.ErrInternal
+	}
+
+	// 通知 Worker：令 EmuRunner 序列化并上传到 MinIO
+	size, err := s.workerClient.SaveState(ctx, room.WorkerAddr, roomID, saveStateID, uploadURL)
+	if err != nil {
+		slog.Error("worker SaveState failed", "room_id", roomID, "error", err)
+		return nil, apperror.ErrSaveStateFailed
+	}
+
+	ss := &model.SaveState{
+		ID:           saveStateID,
+		RoomID:       roomID,
+		EmulatorType: room.EmulatorType,
+		RomID:        *room.RomID,
+		MinioPath:    minioPath,
+		Size:         size,
+		CreatedBy:    hostID,
+	}
+	if err := s.saveStateRepo.Create(ctx, ss); err != nil {
+		slog.Error("failed to persist save state", "room_id", roomID, "error", err)
+		return nil, apperror.ErrInternal
+	}
+
+	slog.Info("save state created", "room_id", roomID, "save_state_id", saveStateID, "size", size)
+	return ss, nil
+}
+
+// LoadState 房主读取存档
+// 流程：校验房主 + 房间 playing → 查存档 → 三要素匹配校验（room_id / emulator_type / rom_id）→
+//
+//	生成 MinIO 预签名 GET URL → gRPC 通知 Worker（下载并令 EmuRunner 反序列化）
+func (s *RoomService) LoadState(ctx context.Context, hostID uuid.UUID, req contract.LoadStateReq) error {
+	roomID := *req.RoomID
+	saveStateID := *req.SaveStateID
+
+	room, err := s.roomRepo.ByID(ctx, roomID)
+	if err != nil || room == nil {
+		return apperror.ErrRoomNotExist
+	}
+	if room.HostID != hostID {
+		return apperror.ErrNotRoomHost
+	}
+	if room.Status != 1 {
+		return apperror.ErrRoomNotPlaying
+	}
+	if room.WorkerAddr == "" {
+		return apperror.ErrWorkerUnavailable
+	}
+
+	ss, err := s.saveStateRepo.ByID(ctx, saveStateID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+	if ss == nil {
+		return apperror.ErrSaveStateNotExist
+	}
+
+	// 三要素匹配校验：房间、模拟器类型、ROM 全部一致才允许读档
+	if ss.RoomID != roomID || ss.EmulatorType != room.EmulatorType || room.RomID == nil || ss.RomID != *room.RomID {
+		return apperror.ErrSaveStateMismatch
+	}
+
+	// 生成预签名 GET URL，Worker 用它下载状态二进制
+	downloadURL, err := s.minioFunc.PresignedGetURL(ctx, s.bucket, ss.MinioPath, 5*time.Minute)
+	if err != nil {
+		slog.Error("failed to generate presigned get url", "room_id", roomID, "error", err)
+		return apperror.ErrInternal
+	}
+
+	if err := s.workerClient.LoadState(ctx, room.WorkerAddr, roomID, saveStateID, downloadURL); err != nil {
+		slog.Error("worker LoadState failed", "room_id", roomID, "error", err)
+		return apperror.ErrLoadStateFailed
+	}
+
+	slog.Info("save state loaded", "room_id", roomID, "save_state_id", saveStateID)
+	return nil
+}
+
+// ListSaveStates 列出房间存档（房间成员可查，创建时间倒序）
+// 仅返回与房间当前模拟器类型、ROM 匹配的存档，避免展示其他游戏的存档
+func (s *RoomService) ListSaveStates(ctx context.Context, userID uuid.UUID, roomID uuid.UUID) ([]model.SaveState, error) {
+	room, err := s.roomRepo.ByID(ctx, roomID)
+	if err != nil || room == nil {
+		return nil, apperror.ErrRoomNotExist
+	}
+
+	player, err := s.roomPlayerRepo.ByRoomAndUser(ctx, roomID, userID)
+	if err != nil || player == nil {
+		return nil, apperror.ErrNotInRoom
+	}
+
+	// 房间尚未选择 ROM 时无匹配存档
+	if room.RomID == nil {
+		return []model.SaveState{}, nil
+	}
+
+	return s.saveStateRepo.ListByRoomRom(ctx, roomID, room.EmulatorType, *room.RomID)
 }

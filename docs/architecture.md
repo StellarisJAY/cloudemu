@@ -265,7 +265,9 @@ Go 通过 cgo 动态加载 libretro 内核（`dlopen`），获取函数符号后
      e. 订阅 DataChannel 接收玩家手柄输入 → retro_input_state 回调
  7. 所有房间玩家收到 LiveKit token → 前端建立 WebRTC 连接
     → 视频轨(接收游戏画面) + 音频轨 + DataChannel(发送手柄输入)
- 8. 定时存档: EmuRunner 每 60s 调用 retro_serialize() → Redis
+ 8. 存档（房主手动）: 房主点击「存档」→ CP 生成 MinIO 预签名 PUT URL + gRPC Worker.SaveState
+    → Worker 经 control DataChannel(0x07) 令 EmuRunner retro_serialize 写共享目录 → Worker 轮询完成标志后上传 MinIO → CP 落库 save_states
+    （MVP 仅手动存档，自动定时存档见 deferred.md）
  9. 玩家离开 / 房主关闭:
     → Control Plane: gRPC 调用 Worker.StopGame(room_id)
     → Worker: kill EmuRunner 子进程 → 清理 LiveKit 房间
@@ -398,6 +400,61 @@ Worker.LiveKitManager.host ──gRPC──→ Control Plane ──REST──→
 - `POST /api/rooms/start` 返回 `{livekit_token: host_token, livekit_room, livekit_url}`
 - `GET /api/rooms/:id/livekit` → CP 调 Worker `GeneratePlayerToken` → 返回该用户专属 token
 - 变更 LiveKit 地址只需重启 Worker，Control Plane 和前端无需任何配置变更
+
+### 8.7 存档 / 读档（SaveState / LoadState）
+
+EmuRunner 只能被动接收 LiveKit control 指令，无 DB / 对象存储能力，且房间关闭后即销毁。
+因此存档数据经 **Worker 中转 + 共享目录**：EmuRunner 与 Worker 同主机，共享 `/tmp/cloudemu/{room_id}/`。
+
+**一个存档 = room_id + emulator_type + rom_id + 序列化数据**；读档时三要素须与当前房间/机种/加载的 ROM 全部匹配。
+存档元数据存 PostgreSQL `save_states` 表，序列化二进制存 MinIO `savestate/{room_id}/{id}.dat`，
+不随房间关闭或 EmuRunner 销毁而删除。MVP 仅房主手动存档/读档；读档仅在房间 `status=1 (playing)` 时允许。
+
+**control DataChannel packet**：`0x07`=SaveState、`0x08`=LoadState（payload 仅 1 byte type）。
+
+**存档流程**：
+
+```
+房主点「存档」
+  → POST /api/rooms/save-state {room_id}
+  → CP: 校验房主+playing+已选ROM → 生成 save_state_id + MinIO 预签名 PUT URL
+       → gRPC Worker.SaveState(room_id, save_state_id, upload_url)
+  → Worker.SaveState:
+       1. 清理残留 state.dat / state.done
+       2. control DataChannel 广播 [0x07] → EmuRunner
+       3. 轮询 /tmp/cloudemu/{room_id}/state.done（间隔 100ms，超时 10s）
+       4. 读 state.dat → HTTP PUT 到 MinIO 预签名 URL → 返回 size
+  → EmuRunner 收到 0x07: retro_serialize → 写 state.dat → 原子 rename state.done
+  → CP 落库 save_states(room_id, emulator_type, rom_id, minio_path, size) → 返回记录
+```
+
+> **存档列表过滤**：`GET /api/rooms/:id/save-states` 仅返回与房间**当前** `emulator_type` + `rom_id` 匹配的存档，避免展示同一房间切换过的其他 ROM/机种的存档；房间未选 ROM 时返回空列表。
+
+**读档流程**：
+
+```
+房主选存档点「读取」
+  → POST /api/rooms/load-state {room_id, save_state_id}
+  → CP: 校验房主+playing → 查存档 → 三要素匹配校验 → 生成 MinIO 预签名 GET URL
+       → gRPC Worker.LoadState(room_id, save_state_id, download_url)
+  → Worker.LoadState:
+       1. 清理残留 load.done → HTTP GET 下载状态二进制到 load.dat
+       2. control DataChannel 广播 [0x08] → EmuRunner
+  → EmuRunner 收到 0x08: 读 load.dat → retro_unserialize → 写 load.done
+```
+
+**关键设计决策**：
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| EmuRunner↔外部 状态传输 | 共享文件 + Worker 中转 | EmuRunner 无 DB/对象存储能力，复用 Worker 的网络能力与同主机共享目录 |
+| 完成回执 | 共享目录标志文件轮询 | 零新增网络链路，最简单；原子 rename 避免读到半成品 |
+| 每房间存档数 | 多存档槽（时间戳列表） | 房主可回溯任意历史存档 |
+| 自动定时存档 | MVP 不做（见 deferred.md） | 先交付手动存档闭环 |
+| 读档时机 | 仅 playing | 对活动 EmuRunner 调用 retro_unserialize |
+| MinIO 上传 | Worker net/http PUT 预签名 URL | Worker 无需 MinIO SDK，与 ROM 下载同风格 |
+
+
 
 ---
 

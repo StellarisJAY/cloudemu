@@ -39,6 +39,7 @@ type MinioFunc interface {
 	UploadFile(ctx context.Context, bucket, path string, reader io.Reader, size int64) error        // 上传文件到指定桶和路径
 	GetURL(ctx context.Context, bucket, path string) (string, error)                                // 获取文件预签名URL（1小时有效期）
 	PresignedGetURL(ctx context.Context, bucket, path string, expiry time.Duration) (string, error) // 获取文件预签名URL（自定有效期）
+	PresignedPutURL(ctx context.Context, bucket, path string, expiry time.Duration) (string, error) // 获取文件预签名上传URL（自定有效期，用于上传存档二进制）
 	GetFile(ctx context.Context, bucket, path string) (io.ReadCloser, error)                        // 读取文件内容（用于代理下载）
 	RemoveFile(ctx context.Context, bucket, path string) error                                      // 删除文件（用于删除内置ROM文件与封面）
 	EnsureBucket(ctx context.Context, bucket string) error                                          // 确保桶存在，不存在则创建

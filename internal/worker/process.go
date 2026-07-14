@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -231,4 +232,134 @@ func (m *SessionManager) StopAll(ctx context.Context) {
 	for _, id := range ids {
 		_ = m.Stop(id)
 	}
+}
+
+// 共享目录中的存档/读档文件名（与 EmuRunner runner.go 保持一致）
+const (
+	saveStateFile = "state.dat"
+	saveDoneFile  = "state.done"
+	loadStateFile = "load.dat"
+	loadDoneFile  = "load.done"
+
+	stateWaitTimeout  = 10 * time.Second        // 等待 EmuRunner 完成序列化/反序列化的超时
+	stateWaitInterval = 100 * time.Millisecond  // 轮询完成标志文件的间隔
+)
+
+// workDirOf 返回房间的共享工作目录
+func (m *SessionManager) workDirOf(roomID string) (string, bool) {
+	m.mu.RLock()
+	session, ok := m.sessions[roomID]
+	m.mu.RUnlock()
+	if !ok {
+		return "", false
+	}
+	return session.WorkDir, true
+}
+
+// PrepareSaveState 清理残留的存档标志文件（在广播 SaveState 指令前调用，避免轮询到旧标志）
+func (m *SessionManager) PrepareSaveState(roomID string) (string, error) {
+	workDir, ok := m.workDirOf(roomID)
+	if !ok {
+		return "", fmt.Errorf("session not found: %s", roomID)
+	}
+	_ = os.Remove(filepath.Join(workDir, saveStateFile))
+	_ = os.Remove(filepath.Join(workDir, saveDoneFile))
+	return workDir, nil
+}
+
+// WaitAndUploadSaveState 轮询 state.done 完成标志，读取 state.dat 并用预签名 PUT URL 上传到 MinIO
+// 返回上传的状态字节数
+func (m *SessionManager) WaitAndUploadSaveState(ctx context.Context, workDir, uploadURL string) (int64, error) {
+	donePath := filepath.Join(workDir, saveDoneFile)
+	if err := waitForFile(ctx, donePath); err != nil {
+		return 0, fmt.Errorf("wait save done: %w", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(workDir, saveStateFile))
+	if err != nil {
+		return 0, fmt.Errorf("read state file: %w", err)
+	}
+
+	if err := uploadFile(ctx, uploadURL, data); err != nil {
+		return 0, fmt.Errorf("upload state: %w", err)
+	}
+
+	// 清理标志文件，为下次存档准备
+	_ = os.Remove(donePath)
+	return int64(len(data)), nil
+}
+
+// PrepareLoadState 下载存档二进制到共享目录 load.dat，并清理旧的完成标志
+// 在广播 LoadState 指令前调用，确保 EmuRunner 读取到最新数据
+func (m *SessionManager) PrepareLoadState(ctx context.Context, roomID, downloadURL string) error {
+	workDir, ok := m.workDirOf(roomID)
+	if !ok {
+		return fmt.Errorf("session not found: %s", roomID)
+	}
+	_ = os.Remove(filepath.Join(workDir, loadDoneFile))
+
+	data, err := downloadBytes(ctx, downloadURL)
+	if err != nil {
+		return fmt.Errorf("download state: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(workDir, loadStateFile), data, 0644); err != nil {
+		return fmt.Errorf("write load file: %w", err)
+	}
+	return nil
+}
+
+// waitForFile 轮询等待文件出现，直到超时或 ctx 取消
+func waitForFile(ctx context.Context, path string) error {
+	deadline := time.Now().Add(stateWaitTimeout)
+	ticker := time.NewTicker(stateWaitInterval)
+	defer ticker.Stop()
+	for {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if time.Now().After(deadline) {
+				return fmt.Errorf("timeout waiting for %s", path)
+			}
+		}
+	}
+}
+
+// uploadFile 用 HTTP PUT 将数据上传到 MinIO 预签名 URL
+func uploadFile(ctx context.Context, uploadURL string, data []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.ContentLength = int64(len(data))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("upload failed with status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// downloadBytes 从 URL 下载全部内容
+func downloadBytes(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
 }

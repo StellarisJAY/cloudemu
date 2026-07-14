@@ -67,4 +67,9 @@ type WorkerClient interface {
 	PauseGame(ctx context.Context, workerAddr string, roomID uuid.UUID) error
 	// ResumeGame 通知 Worker 继续指定房间的模拟器运行
 	ResumeGame(ctx context.Context, workerAddr string, roomID uuid.UUID) error
+	// SaveState 通知 Worker 保存存档：令 EmuRunner 序列化并上传到 MinIO（uploadURL 为预签名 PUT URL）
+	// 返回序列化状态的字节数
+	SaveState(ctx context.Context, workerAddr string, roomID, saveStateID uuid.UUID, uploadURL string) (int64, error)
+	// LoadState 通知 Worker 读取存档：下载状态二进制并令 EmuRunner 反序列化（downloadURL 为预签名 GET URL）
+	LoadState(ctx context.Context, workerAddr string, roomID, saveStateID uuid.UUID, downloadURL string) error
 }

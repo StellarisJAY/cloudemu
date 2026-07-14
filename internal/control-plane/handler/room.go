@@ -270,3 +270,59 @@ func (h *RoomHandler) Delete(c *gin.Context) {
 
 	response.OK(c, nil)
 }
+
+// SaveState POST /api/rooms/save-state — 房主保存存档（需登录）
+func (h *RoomHandler) SaveState(c *gin.Context) {
+	var req contract.SaveStateReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	hostID := c.MustGet("user_id").(uuid.UUID)
+
+	ss, err := h.svc.SaveState(c.Request.Context(), hostID, *req.RoomID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.Created(c, ss)
+}
+
+// LoadState POST /api/rooms/load-state — 房主读取存档（需登录）
+func (h *RoomHandler) LoadState(c *gin.Context) {
+	var req contract.LoadStateReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	hostID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.svc.LoadState(c.Request.Context(), hostID, req); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
+// ListSaveStates GET /api/rooms/:id/save-states — 列出房间存档（房间成员可查，需登录）
+func (h *RoomHandler) ListSaveStates(c *gin.Context) {
+	roomID, err := parseUUIDParam(c, "id")
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	states, err := h.svc.ListSaveStates(c.Request.Context(), userID, roomID)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.OK(c, states)
+}

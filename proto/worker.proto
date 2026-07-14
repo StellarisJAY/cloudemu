@@ -38,6 +38,16 @@ service WorkerAgent {
   // ResumeGame 继续游戏模拟器运行
   // 房主调用，Worker 通过 LiveKit DataChannel (topic="control", type=0x06) 发送继续指令到 EmuRunner
   rpc ResumeGame(ResumeGameRequest) returns (ResumeGameResponse);
+
+  // SaveState 保存游戏存档
+  // 房主调用：Worker 通过 control DataChannel (type=0x07) 令 EmuRunner 序列化到共享目录，
+  // 轮询到完成标志后读取状态二进制，用预签名 URL 上传到 MinIO
+  rpc SaveState(SaveStateRequest) returns (SaveStateResponse);
+
+  // LoadState 读取游戏存档
+  // 房主调用：Worker 用预签名 URL 下载状态二进制到共享目录，通过 control DataChannel (type=0x08)
+  // 令 EmuRunner 反序列化恢复游戏进度
+  rpc LoadState(LoadStateRequest) returns (LoadStateResponse);
 }
 
 // StartGameRequest 启动游戏会话请求
@@ -115,3 +125,25 @@ message ResumeGameRequest {
 
 // ResumeGameResponse 继续游戏响应（空消息）
 message ResumeGameResponse {}
+
+// SaveStateRequest 保存存档请求
+message SaveStateRequest {
+  string room_id = 1;         // 房间 ID
+  string save_state_id = 2;   // 存档 ID（UUIDv7 字符串），用于日志与文件命名
+  string upload_url = 3;      // MinIO 预签名 PUT URL，Worker 用于上传状态二进制
+}
+
+// SaveStateResponse 保存存档响应
+message SaveStateResponse {
+  int64 size = 1;             // 序列化状态字节数
+}
+
+// LoadStateRequest 读取存档请求
+message LoadStateRequest {
+  string room_id = 1;         // 房间 ID
+  string save_state_id = 2;   // 存档 ID（UUIDv7 字符串），用于日志与文件命名
+  string download_url = 3;    // MinIO 预签名 GET URL，Worker 用于下载状态二进制
+}
+
+// LoadStateResponse 读取存档响应（空消息）
+message LoadStateResponse {}

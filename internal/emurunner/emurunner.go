@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sync"
 
 	"github.com/StellarisJAY/cloudemu/internal/emurunner/backend"
@@ -18,6 +19,7 @@ type Instance struct {
 	connectedMembers map[string]*lksdk.RemoteParticipant
 	mutex            sync.Mutex
 	upscaleEnabled   bool
+	workDir          string // 共享工作目录（ROM 所在目录，= /tmp/cloudemu/{room_id}/），存档/读档文件在此
 }
 
 // NewInstance 创建模拟器实例
@@ -36,6 +38,8 @@ func NewInstance(config LiveKitConfig, emulatorType backend.Type, hostIdentity s
 }
 
 func (instance *Instance) InitRunner(path string) error {
+	// 共享工作目录 = ROM 文件所在目录（Worker 会把存档/读档文件放在此处）
+	instance.workDir = filepath.Dir(path)
 	// 初始化模拟器后端
 	if err := instance.runner.Init(); err != nil {
 		return fmt.Errorf("emurunner init backend error: %w", err)
@@ -57,6 +61,16 @@ func (instance *Instance) InitPublisher() error {
 	}
 	instance.publisher.OnResume = func() {
 		instance.runner.Resume(context.TODO())
+	}
+	instance.publisher.OnSaveState = func() {
+		if err := instance.runner.SaveState(instance.workDir); err != nil {
+			slog.Error("save state failed", "error", err)
+		}
+	}
+	instance.publisher.OnLoadState = func() {
+		if err := instance.runner.LoadState(instance.workDir); err != nil {
+			slog.Error("load state failed", "error", err)
+		}
 	}
 
 	if err := instance.publisher.ConnectRoom(); err != nil {

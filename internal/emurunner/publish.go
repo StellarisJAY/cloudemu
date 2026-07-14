@@ -24,6 +24,8 @@ const (
 	packetTypePong    byte = 0x04 // 延迟探测回复：[type][client_ts:8B LE][server_ts:8B LE]
 	packetTypePause   byte = 0x05 // 暂停模拟器运行
 	packetTypeResume  byte = 0x06 // 继续模拟器运行
+	packetTypeSave    byte = 0x07 // 保存存档：序列化到共享目录
+	packetTypeLoad    byte = 0x08 // 读取存档：从共享目录反序列化
 )
 
 // DataChannel topic 字符串
@@ -45,6 +47,8 @@ type LiveKitPublisher struct {
 	OnMemberDisconnect func(*lksdk.RemoteParticipant)
 	OnPause            func() // handleControlPacket 收到 type=0x05 时调用
 	OnResume           func() // handleControlPacket 收到 type=0x06 时调用
+	OnSaveState        func() // handleControlPacket 收到 type=0x07 时调用
+	OnLoadState        func() // handleControlPacket 收到 type=0x08 时调用
 }
 
 func NewLiveKitPublisher(config LiveKitConfig, inputMgr *InputManager) *LiveKitPublisher {
@@ -162,6 +166,16 @@ func (l *LiveKitPublisher) handleControlPacket(senderIdentity string, payload []
 		slog.Info("resume command received via control channel")
 		if l.OnResume != nil {
 			l.OnResume()
+		}
+	case packetTypeSave:
+		slog.Info("save state command received via control channel")
+		if l.OnSaveState != nil {
+			l.OnSaveState()
+		}
+	case packetTypeLoad:
+		slog.Info("load state command received via control channel")
+		if l.OnLoadState != nil {
+			l.OnLoadState()
 		}
 	default:
 		slog.Warn("unknown control packet type", "type", payload[0])

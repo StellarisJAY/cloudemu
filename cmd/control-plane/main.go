@@ -74,6 +74,7 @@ func main() {
 		&model.Room{},
 		&model.RoomPlayer{},
 		&model.Rom{},
+		&model.SaveState{},
 	); err != nil {
 		slog.Error("failed to migrate", "error", err)
 		os.Exit(1)
@@ -106,6 +107,7 @@ func main() {
 	roomPlayerRepo := repo.NewRoomPlayerRepo(db)
 	romRepo := repo.NewRomRepo(db)
 	friendRepo := repo.NewFriendRepo(db)
+	saveStateRepo := repo.NewSaveStateRepo(db)
 
 	// ---- 依赖注入：Cache 层 ----
 	captchaCache := cache.NewCaptcha(rds)
@@ -165,6 +167,7 @@ func main() {
 		roomRepo, roomPlayerRepo, friendRepo, roomStateCache,
 		romRepo, workerScheduler, workerRegistry, workerClient,
 		minioAdapter, cfg.MinioBucket,
+		saveStateRepo,
 	)
 	romSvc := service.NewRomService(romRepo, minioAdapter, cfg.MinioBucket)
 	friendSvc := service.NewFriendService(friendRepo, userRepo)

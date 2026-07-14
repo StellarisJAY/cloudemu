@@ -184,6 +184,31 @@ func (lb *LibretroBackend) Run() {
 	C.core_run(lb.ptr)
 }
 
+// Serialize 序列化当前模拟器运行状态（存档）
+// 调用 retro_serialize_size 获取所需缓冲区大小，再调用 retro_serialize 写入
+func (lb *LibretroBackend) Serialize() ([]byte, error) {
+	size := C.core_serialize_size(lb.ptr)
+	if size == 0 {
+		return nil, errors.New("serialize not supported by core")
+	}
+	buf := make([]byte, int(size))
+	if !bool(C.core_serialize(lb.ptr, unsafe.Pointer(&buf[0]), size)) {
+		return nil, errors.New("retro_serialize failed")
+	}
+	return buf, nil
+}
+
+// Unserialize 从存档数据恢复模拟器运行状态（读档）
+func (lb *LibretroBackend) Unserialize(data []byte) error {
+	if len(data) == 0 {
+		return errors.New("empty save state data")
+	}
+	if !bool(C.core_unserialize(lb.ptr, unsafe.Pointer(&data[0]), C.size_t(len(data)))) {
+		return errors.New("retro_unserialize failed")
+	}
+	return nil
+}
+
 // LoadGameFile 加载rom文件
 func (lb *LibretroBackend) LoadGameFile(path string) bool {
 	cpath := C.CString(path)

@@ -166,6 +166,17 @@ type DeleteRoomReq struct {
 	RoomID *uuid.UUID `json:"room_id" binding:"required,notnil_uuid"` // 要删除的房间ID
 }
 
+// SaveStateReq 保存存档请求
+type SaveStateReq struct {
+	RoomID *uuid.UUID `json:"room_id" binding:"required,notnil_uuid"` // 要保存存档的房间ID
+}
+
+// LoadStateReq 读取存档请求
+type LoadStateReq struct {
+	RoomID      *uuid.UUID `json:"room_id"       binding:"required,notnil_uuid"` // 房间ID
+	SaveStateID *uuid.UUID `json:"save_state_id" binding:"required,notnil_uuid"` // 要读取的存档ID
+}
+
 // LivekitTokenResp 查询 LiveKit token 响应
 // 游戏未开始时返回 { waiting: true }，游戏进行中返回 { livekit_token, livekit_room, livekit_url }
 type LivekitTokenResp struct {

@@ -208,3 +208,55 @@ func (s *WorkerServer) ResumeGame(ctx context.Context, req *workerpb.ResumeGameR
 	slog.Info("resume command broadcasted", "room_id", roomID)
 	return &workerpb.ResumeGameResponse{}, nil
 }
+
+// SaveState 保存游戏存档
+// 流程：清理残留标志 → control 广播 0x07（令 EmuRunner 序列化）→ 轮询 state.done → 读文件并 PUT 到 MinIO
+func (s *WorkerServer) SaveState(ctx context.Context, req *workerpb.SaveStateRequest) (*workerpb.SaveStateResponse, error) {
+	roomID := req.GetRoomId()
+	slog.Info("SaveState received", "room_id", roomID, "save_state_id", req.GetSaveStateId())
+
+	// 1. 清理残留存档标志，获取共享工作目录
+	workDir, err := s.sessions.PrepareSaveState(roomID)
+	if err != nil {
+		slog.Error("prepare save state failed", "room_id", roomID, "error", err)
+		return nil, err
+	}
+
+	// 2. control DataChannel 广播 0x07，令 EmuRunner 序列化到共享目录
+	if err := s.livekit.SendDataBroadcast(ctx, roomID, "control", true, []byte{0x07}); err != nil {
+		slog.Error("failed to broadcast save state command", "room_id", roomID, "error", err)
+		return nil, err
+	}
+
+	// 3. 轮询 state.done 完成标志，读取 state.dat 并上传到 MinIO
+	size, err := s.sessions.WaitAndUploadSaveState(ctx, workDir, req.GetUploadUrl())
+	if err != nil {
+		slog.Error("wait and upload save state failed", "room_id", roomID, "error", err)
+		return nil, err
+	}
+
+	slog.Info("save state completed", "room_id", roomID, "size", size)
+	return &workerpb.SaveStateResponse{Size: size}, nil
+}
+
+// LoadState 读取游戏存档
+// 流程：下载状态二进制到共享目录 load.dat → control 广播 0x08（令 EmuRunner 反序列化）
+func (s *WorkerServer) LoadState(ctx context.Context, req *workerpb.LoadStateRequest) (*workerpb.LoadStateResponse, error) {
+	roomID := req.GetRoomId()
+	slog.Info("LoadState received", "room_id", roomID, "save_state_id", req.GetSaveStateId())
+
+	// 1. 下载存档二进制到共享目录 load.dat
+	if err := s.sessions.PrepareLoadState(ctx, roomID, req.GetDownloadUrl()); err != nil {
+		slog.Error("prepare load state failed", "room_id", roomID, "error", err)
+		return nil, err
+	}
+
+	// 2. control DataChannel 广播 0x08，令 EmuRunner 反序列化恢复进度
+	if err := s.livekit.SendDataBroadcast(ctx, roomID, "control", true, []byte{0x08}); err != nil {
+		slog.Error("failed to broadcast load state command", "room_id", roomID, "error", err)
+		return nil, err
+	}
+
+	slog.Info("load state completed", "room_id", roomID)
+	return &workerpb.LoadStateResponse{}, nil
+}

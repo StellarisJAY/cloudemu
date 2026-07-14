@@ -16,6 +16,9 @@ import type {
   ResumeRoomReq,
   StopRoomReq,
   DeleteRoomReq,
+  SaveState,
+  SaveStateReq,
+  LoadStateReq,
 } from '@/types/api'
 
 export const roomApi = {
@@ -87,5 +90,20 @@ export const roomApi = {
   /** POST /api/rooms/delete — 房主删除房间 */
   deleteRoom(data: DeleteRoomReq) {
     return client.post<ApiResponse<null>>('/rooms/delete', data)
+  },
+
+  /** POST /api/rooms/save-state — 房主保存存档 */
+  saveState(data: SaveStateReq) {
+    return client.post<ApiResponse<SaveState>>('/rooms/save-state', data)
+  },
+
+  /** POST /api/rooms/load-state — 房主读取存档 */
+  loadState(data: LoadStateReq) {
+    return client.post<ApiResponse<null>>('/rooms/load-state', data)
+  },
+
+  /** GET /api/rooms/:id/save-states — 列出房间存档 */
+  listSaveStates(roomId: string) {
+    return client.get<ApiResponse<SaveState[]>>(`/rooms/${roomId}/save-states`)
   },
 }

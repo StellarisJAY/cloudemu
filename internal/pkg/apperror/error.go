@@ -52,6 +52,10 @@ var (
 	ErrKickHost       = &AppError{2013, "不能踢出房主", 400}
 	ErrRomNotSelected = &AppError{2014, "房间尚未选择 ROM，无法开始游戏", 400}
 	ErrRoomNotPlaying = &AppError{2015, "手柄分配仅限游戏中", 400}
+	ErrSaveStateNotExist  = &AppError{2016, "存档不存在", 404}
+	ErrSaveStateMismatch  = &AppError{2017, "存档与当前房间、模拟器类型或 ROM 不匹配", 400}
+	ErrSaveStateFailed    = &AppError{2018, "存档失败", 500}
+	ErrLoadStateFailed    = &AppError{2019, "读档失败", 500}
 )
 
 // ---- ROM 模块错误 (3001-3005) ----

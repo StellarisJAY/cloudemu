@@ -124,5 +124,14 @@ ROM 的 `status` 字段支持 `0=pending, 1=approved, 2=rejected`，但管理审
 
 - **房间人数上限**: 统一最大4人，房间 `max_ports` 是否允许更多旁观者？
 - **Gorm AutoMigrate 索引**: 部分唯一索引（如 `uk_friends_pair`、`uk_rp_active`）依赖表达式和 WHERE 子句，Gorm AutoMigrate 是否自动创建？
-- **SaveState 持久化**: 定时存档从 Redis 持久化到 MinIO 的时机和策略
 - **前端 Gamepad API 集成**: 浏览器端是否支持真实手柄（`navigator.getGamepads()`）作为输入源替代键盘映射？
+
+## 7. 存档 / 读档增强
+
+手动存档/读档已实现（房主在 PlayView 侧边栏操作，见 architecture.md §8.7、db.md `save_states`）。以下增强延后：
+
+- **自动定时存档**: architecture.md 曾设想 EmuRunner 每 60s 自动 `retro_serialize`。MVP 仅做房主手动存档，自动定时存档（写入 MinIO 的频率/去重/淘汰策略）留待后续。
+- **删除存档**: 当前仅支持新增 + 列表 + 读取，删除单条存档 API 待后续。
+- **存档备注名**: 当前仅按时间戳展示，允许房主命名存档待后续。
+- **每房间存档数量上限 / 自动淘汰最旧**: 当前不限量，超限淘汰策略待后续。
+- **故障恢复**: Worker 宕机后基于最近存档恢复会话（见 §1，Phase 3）。

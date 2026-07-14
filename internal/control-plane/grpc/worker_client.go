@@ -210,6 +210,54 @@ func (c *WorkerClient) ResumeGame(ctx context.Context, workerAddr string, roomID
 	return nil
 }
 
+// SaveState 通知 Worker 保存存档：令 EmuRunner 序列化并上传到 MinIO（uploadURL 为预签名 PUT URL）
+func (c *WorkerClient) SaveState(ctx context.Context, workerAddr string, roomID, saveStateID uuid.UUID, uploadURL string) (int64, error) {
+	_, client, err := c.getConn(workerAddr)
+	if err != nil {
+		slog.Error("get grpc conn failed for SaveState", "worker", workerAddr, "error", err)
+		return 0, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	resp, err := client.SaveState(ctx, &workerpb.SaveStateRequest{
+		RoomId:      roomID.String(),
+		SaveStateId: saveStateID.String(),
+		UploadUrl:   uploadURL,
+	})
+	if err != nil {
+		slog.Warn("worker SaveState gRPC failed", "worker", workerAddr, "room_id", roomID, "error", err)
+		return 0, fmt.Errorf("worker SaveState: %w", err)
+	}
+
+	return resp.GetSize(), nil
+}
+
+// LoadState 通知 Worker 读取存档：下载状态二进制并令 EmuRunner 反序列化（downloadURL 为预签名 GET URL）
+func (c *WorkerClient) LoadState(ctx context.Context, workerAddr string, roomID, saveStateID uuid.UUID, downloadURL string) error {
+	_, client, err := c.getConn(workerAddr)
+	if err != nil {
+		slog.Error("get grpc conn failed for LoadState", "worker", workerAddr, "error", err)
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	_, err = client.LoadState(ctx, &workerpb.LoadStateRequest{
+		RoomId:      roomID.String(),
+		SaveStateId: saveStateID.String(),
+		DownloadUrl: downloadURL,
+	})
+	if err != nil {
+		slog.Warn("worker LoadState gRPC failed", "worker", workerAddr, "room_id", roomID, "error", err)
+		return fmt.Errorf("worker LoadState: %w", err)
+	}
+
+	return nil
+}
+
 // Close 关闭所有 gRPC 连接
 func (c *WorkerClient) Close() {
 	c.mu.Lock()

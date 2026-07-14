@@ -13,6 +13,7 @@ import type {
   RoomMemberInfo,
   KickPlayerReq,
   PlayerRole,
+  SaveState,
 } from '@/types/api'
 
 export interface PlayMember {
@@ -248,6 +249,50 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
+  async function saveState(roomId: string): Promise<string | null> {
+    try {
+      const res = await roomApi.saveState({ room_id: roomId })
+      if (res.data.code !== 0) {
+        return res.data.message || '存档失败'
+      }
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，存档失败'
+      }
+      return '网络错误，存档失败'
+    }
+  }
+
+  async function loadState(roomId: string, saveStateId: string): Promise<string | null> {
+    try {
+      const res = await roomApi.loadState({ room_id: roomId, save_state_id: saveStateId })
+      if (res.data.code !== 0) {
+        return res.data.message || '读档失败'
+      }
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，读档失败'
+      }
+      return '网络错误，读档失败'
+    }
+  }
+
+  async function listSaveStates(roomId: string): Promise<SaveState[]> {
+    try {
+      const res = await roomApi.listSaveStates(roomId)
+      if (res.data.code !== 0) {
+        return []
+      }
+      return res.data.data ?? []
+    } catch {
+      return []
+    }
+  }
+
   return {
     rooms,
     loading,
@@ -265,5 +310,8 @@ export const useRoomStore = defineStore('room', () => {
     stopGame,
     leaveRoom,
     deleteRoom,
+    saveState,
+    loadState,
+    listSaveStates,
   }
 })

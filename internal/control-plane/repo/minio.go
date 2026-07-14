@@ -56,6 +56,15 @@ func (m *MinioAdapter) PresignedGetURL(ctx context.Context, bucket, path string,
 	return url.String(), nil
 }
 
+// PresignedPutURL 获取文件预签名上传URL（自定有效期），Worker 用于上传存档二进制到 MinIO
+func (m *MinioAdapter) PresignedPutURL(ctx context.Context, bucket, path string, expiry time.Duration) (string, error) {
+	url, err := m.cli.PresignedPutObject(ctx, bucket, path, expiry)
+	if err != nil {
+		return "", err
+	}
+	return url.String(), nil
+}
+
 // EnsureBucket 确保桶存在，不存在则自动创建
 func (m *MinioAdapter) EnsureBucket(ctx context.Context, bucket string) error {
 	exists, err := m.cli.BucketExists(ctx, bucket)

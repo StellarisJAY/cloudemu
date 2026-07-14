@@ -97,6 +97,9 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
 			auth.POST("/rooms/resume", h.Room.Resume)
 			auth.POST("/rooms/stop", h.Room.Stop)
 			auth.POST("/rooms/delete", h.Room.Delete)
+			auth.POST("/rooms/save-state", h.Room.SaveState)
+			auth.POST("/rooms/load-state", h.Room.LoadState)
+			auth.GET("/rooms/:id/save-states", h.Room.ListSaveStates)
 
 			// ROM
 			auth.GET("/roms", h.Rom.List)

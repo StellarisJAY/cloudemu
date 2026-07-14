@@ -23,6 +23,9 @@ type RoomService interface {
 	GetMembers(ctx context.Context, userID uuid.UUID, roomID uuid.UUID) ([]RoomMemberInfo, error)       // 获取房间成员列表
 	KickPlayer(ctx context.Context, hostID uuid.UUID, req KickPlayerReq) error                          // 房主踢出玩家
 	Leave(ctx context.Context, userID uuid.UUID, roomID uuid.UUID) error                                // 玩家离开房间，房主离开时自动转移/关闭
+	SaveState(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) (*model.SaveState, error)        // 房主保存存档：校验房主+playing+已选ROM→预签名PUT→通知Worker→落库
+	LoadState(ctx context.Context, hostID uuid.UUID, req LoadStateReq) error                            // 房主读取存档：校验房主+playing+三要素匹配→预签名GET→通知Worker反序列化
+	ListSaveStates(ctx context.Context, userID uuid.UUID, roomID uuid.UUID) ([]model.SaveState, error)  // 列出房间存档（房间成员可查，仅返回与当前机种+ROM匹配的存档，时间倒序）
 }
 
 // RoomRepo 房间表数据访问接口
@@ -55,4 +58,12 @@ type RoomStateCache interface {
 	ClearRoom(ctx context.Context, roomID uuid.UUID) error                                            // 清除房间所有缓存数据
 	SetLivekitInfo(ctx context.Context, roomID uuid.UUID, livekitUrl string, room string) error       // 存储 LiveKit 地址和房间名（token 由玩家独立生成，不再缓存）
 	GetLivekitInfo(ctx context.Context, roomID uuid.UUID) (livekitUrl string, room string, err error) // 获取 LiveKit 地址和房间名
+}
+
+// SaveStateRepo 游戏存档表数据访问接口
+type SaveStateRepo interface {
+	Create(ctx context.Context, ss *model.SaveState) error                              // 插入存档记录
+	ByID(ctx context.Context, id uuid.UUID) (*model.SaveState, error)                   // 按ID查询存档
+	ListByRoom(ctx context.Context, roomID uuid.UUID) ([]model.SaveState, error)        // 查询指定房间的所有存档（创建时间倒序）
+	ListByRoomRom(ctx context.Context, roomID uuid.UUID, emulatorType string, romID uuid.UUID) ([]model.SaveState, error) // 查询房间+机种+ROM 三者匹配的存档（创建时间倒序）
 }

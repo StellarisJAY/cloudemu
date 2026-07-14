@@ -13,6 +13,7 @@ import GameToolbar from '@/components/play/GameToolbar.vue'
 import GameScreen from '@/components/play/GameScreen.vue'
 import MemberPanel from '@/components/play/MemberPanel.vue'
 import VirtualGamepad from '@/components/play/VirtualGamepad.vue'
+import SaveStateDialog from '@/components/play/SaveStateDialog.vue'
 import type { Room, PlayerRole } from '@/types/api'
 import type { ButtonName } from '@/utils/keyMapping'
 import { useMediaQuery } from '@vueuse/core'
@@ -270,7 +271,19 @@ async function handleStop() {
 }
 
 function handleSaveState() {
-  message.success('存档已保存')
+  roomStore.saveState(roomId).then((err) => {
+    if (err) {
+      message.error(err)
+      return
+    }
+    message.success('存档已保存')
+  })
+}
+
+const showSaveStateDialog = ref(false)
+
+function handleLoadState() {
+  showSaveStateDialog.value = true
 }
 
 async function handleRoleChange(userId: string, role: PlayerRole, port?: number) {
@@ -357,6 +370,7 @@ function handleLeave() {
           @resume="handleResume"
           @stop="handleStop"
           @save-state="handleSaveState"
+          @load-state="handleLoadState"
           @connect="handleConnect"
           @key-mapping-saved="gameInput.reloadMapping"
         />
@@ -423,6 +437,7 @@ function handleLeave() {
             @resume="handleResume"
             @stop="handleStop"
             @save-state="handleSaveState"
+            @load-state="handleLoadState"
             @connect="handleConnect"
             @key-mapping-saved="gameInput.reloadMapping"
           />
@@ -451,6 +466,12 @@ function handleLeave() {
         </div>
       </template>
     </template>
+
+    <SaveStateDialog
+      :show="showSaveStateDialog"
+      :room-id="roomId"
+      @close="showSaveStateDialog = false"
+    />
   </div>
 </template>
 

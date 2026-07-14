@@ -223,6 +223,26 @@ export interface DeleteRoomReq {
   room_id: string
 }
 
+/** 游戏存档记录（与后端 model.SaveState 对应） */
+export interface SaveState {
+  id: string
+  room_id: string
+  emulator_type: EmulatorType
+  rom_id: string
+  size: number
+  created_by: string
+  created_at: string
+}
+
+export interface SaveStateReq {
+  room_id: string
+}
+
+export interface LoadStateReq {
+  room_id: string
+  save_state_id: string
+}
+
 // ==================== 好友 ====================
 
 /** 好友状态：0=待接受, 1=已接受, 2=已拉黑, 3=已拒绝 */
