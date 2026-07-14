@@ -256,9 +256,9 @@ handler ──→ contract  ←── service
 | `RoomRepo` | Create, ByID, ActiveByUser, UpdateStatus, SetWorkerAddr | 房间表操作；SetWorkerAddr 记录分配到的 Worker |
 | `RoomPlayerRepo` | Create, ActiveByRoom, ActiveByUser, ByRoomAndUser, UpdateRoleAndPort, MarkLeft, TransferHost | 房间座位操作 |
 | `RoomStateCache` | SetPort, RemovePort, GetPorts, ClearRoom | 房间端口映射缓存 |
-| `SaveStateRepo` | Create, ByID, ListByRoom | 游戏存档表操作（save_states） |
+| `SaveStateRepo` | Create, ByID, ListByRoom, ListByRoomRom, LatestByRoomRom, Rename, Delete | 游戏存档表操作（save_states） |
 
-> **存档接口补充**：`RoomService` 另有 `SaveState / LoadState / ListSaveStates` 方法；`WorkerClient` 另有 `SaveState / LoadState` 方法；`MinioFunc` 另有 `PresignedPutURL`（Worker 上传存档二进制用）。
+> **存档接口补充**：`RoomService` 另有 `SaveState / LoadState / LoadLatestState / RenameSaveState / DeleteSaveState / ListSaveStates` 方法；`WorkerClient` 另有 `SaveState / LoadState` 方法；`MinioFunc` 另有 `PresignedPutURL`（Worker 上传存档二进制用）、`RemoveFile`（删除存档时清理 MinIO 对象）。
 
 ### contract/scheduler.go — 3 个接口
 
@@ -764,6 +764,9 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
 			auth.POST("/rooms/leave",     h.Room.Leave)
 			auth.POST("/rooms/save-state",  h.Room.SaveState)      // 房主保存存档
 			auth.POST("/rooms/load-state",  h.Room.LoadState)      // 房主读取存档（三要素匹配校验）
+			auth.POST("/rooms/load-latest-state", h.Room.LoadLatestState)   // 房主加载最新存档
+			auth.POST("/rooms/rename-save-state", h.Room.RenameSaveState)   // 房主重命名存档
+			auth.POST("/rooms/delete-save-state", h.Room.DeleteSaveState)   // 房主删除存档（同时清 MinIO）
 			auth.GET("/rooms/:id/save-states", h.Room.ListSaveStates) // 房间存档列表（成员可查）
 
             // ROM

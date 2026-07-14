@@ -25,6 +25,9 @@ type RoomService interface {
 	Leave(ctx context.Context, userID uuid.UUID, roomID uuid.UUID) error                                // 玩家离开房间，房主离开时自动转移/关闭
 	SaveState(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) (*model.SaveState, error)        // 房主保存存档：校验房主+playing+已选ROM→预签名PUT→通知Worker→落库
 	LoadState(ctx context.Context, hostID uuid.UUID, req LoadStateReq) error                            // 房主读取存档：校验房主+playing+三要素匹配→预签名GET→通知Worker反序列化
+	LoadLatestState(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) error                      // 房主加载最新存档：取当前机种+ROM的最新存档并读取
+	RenameSaveState(ctx context.Context, hostID uuid.UUID, req RenameSaveStateReq) error                // 房主重命名存档
+	DeleteSaveState(ctx context.Context, hostID uuid.UUID, req DeleteSaveStateReq) error                // 房主删除存档（同时删除 MinIO 二进制）
 	ListSaveStates(ctx context.Context, userID uuid.UUID, roomID uuid.UUID) ([]model.SaveState, error)  // 列出房间存档（房间成员可查，仅返回与当前机种+ROM匹配的存档，时间倒序）
 }
 
@@ -66,4 +69,7 @@ type SaveStateRepo interface {
 	ByID(ctx context.Context, id uuid.UUID) (*model.SaveState, error)                   // 按ID查询存档
 	ListByRoom(ctx context.Context, roomID uuid.UUID) ([]model.SaveState, error)        // 查询指定房间的所有存档（创建时间倒序）
 	ListByRoomRom(ctx context.Context, roomID uuid.UUID, emulatorType string, romID uuid.UUID) ([]model.SaveState, error) // 查询房间+机种+ROM 三者匹配的存档（创建时间倒序）
+	LatestByRoomRom(ctx context.Context, roomID uuid.UUID, emulatorType string, romID uuid.UUID) (*model.SaveState, error) // 查询房间+机种+ROM 三者匹配的最新一条存档，无匹配返回 nil
+	Rename(ctx context.Context, id uuid.UUID, name string) error                        // 修改存档名称
+	Delete(ctx context.Context, id uuid.UUID) error                                     // 删除存档记录
 }

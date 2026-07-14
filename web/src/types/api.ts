@@ -227,6 +227,7 @@ export interface DeleteRoomReq {
 export interface SaveState {
   id: string
   room_id: string
+  name: string
   emulator_type: EmulatorType
   rom_id: string
   size: number
@@ -239,6 +240,21 @@ export interface SaveStateReq {
 }
 
 export interface LoadStateReq {
+  room_id: string
+  save_state_id: string
+}
+
+export interface LoadLatestStateReq {
+  room_id: string
+}
+
+export interface RenameSaveStateReq {
+  room_id: string
+  save_state_id: string
+  name: string
+}
+
+export interface DeleteSaveStateReq {
   room_id: string
   save_state_id: string
 }

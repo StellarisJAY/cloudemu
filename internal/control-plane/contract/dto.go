@@ -177,6 +177,24 @@ type LoadStateReq struct {
 	SaveStateID *uuid.UUID `json:"save_state_id" binding:"required,notnil_uuid"` // 要读取的存档ID
 }
 
+// LoadLatestStateReq 加载最新存档请求
+type LoadLatestStateReq struct {
+	RoomID *uuid.UUID `json:"room_id" binding:"required,notnil_uuid"` // 房间ID
+}
+
+// RenameSaveStateReq 重命名存档请求
+type RenameSaveStateReq struct {
+	RoomID      *uuid.UUID `json:"room_id"       binding:"required,notnil_uuid"`      // 房间ID
+	SaveStateID *uuid.UUID `json:"save_state_id" binding:"required,notnil_uuid"`      // 要重命名的存档ID
+	Name        string     `json:"name"          binding:"required,min=1,max=64"`     // 新名称
+}
+
+// DeleteSaveStateReq 删除存档请求
+type DeleteSaveStateReq struct {
+	RoomID      *uuid.UUID `json:"room_id"       binding:"required,notnil_uuid"` // 房间ID
+	SaveStateID *uuid.UUID `json:"save_state_id" binding:"required,notnil_uuid"` // 要删除的存档ID
+}
+
 // LivekitTokenResp 查询 LiveKit token 响应
 // 游戏未开始时返回 { waiting: true }，游戏进行中返回 { livekit_token, livekit_room, livekit_url }
 type LivekitTokenResp struct {

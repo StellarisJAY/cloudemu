@@ -504,6 +504,7 @@ CREATE INDEX ix_roms_builtin  ON roms (is_builtin);
 CREATE TABLE save_states (
     id            UUID PRIMARY KEY,
     room_id       UUID         NOT NULL,           -- 所属房间（不随房间关闭而删除）
+    name          VARCHAR(64)  NOT NULL,           -- 存档名称（房主可改名，默认为创建时间字符串）
     emulator_type VARCHAR(32)  NOT NULL,           -- 'nes', 'gb', 'dos'
     rom_id        UUID         NOT NULL,           -- 存档对应的 ROM
     minio_path    VARCHAR(512) NOT NULL,           -- MinIO 状态二进制路径 savestate/{room_id}/{id}.dat
@@ -519,6 +520,7 @@ CREATE INDEX ix_save_states_rom  ON save_states (rom_id);
 | 列 | 类型 | 说明 |
 |----|------|------|
 | room_id | UUID | 所属房间；读档时须与当前房间匹配 |
+| name | VARCHAR(64) | 存档名称，房主可通过重命名接口修改；创建时默认取存档时间字符串 |
 | emulator_type | VARCHAR(32) | 模拟器类型；读档时须与当前房间匹配 |
 | rom_id | UUID | 存档对应的 ROM；读档时须与当前加载的 ROM 匹配 |
 | minio_path | VARCHAR(512) | MinIO 上的状态二进制路径 `savestate/{room_id}/{id}.dat` |
@@ -526,9 +528,9 @@ CREATE INDEX ix_save_states_rom  ON save_states (rom_id);
 
 > **一个存档 = room_id + emulator_type + rom_id + 序列化数据**。读档时三要素（房间/机种/ROM）须与当前全部匹配才允许，否则返回「存档与当前房间、模拟器类型或 ROM 不匹配」。
 >
-> **持久性**: 存档不随房间 Stop/Delete/StopGame 级联删除，DB 记录与 MinIO 对象生命周期独立于房间与 EmuRunner 子进程。
+> **持久性**: 存档不随房间 Stop/Delete/StopGame 级联删除，DB 记录与 MinIO 对象生命周期独立于房间与 EmuRunner 子进程。删除存档接口 `POST /api/rooms/delete-save-state` 会同时删除 DB 记录与 MinIO 对象。
 >
-> **多存档槽**: 每次存档新建一条记录，房主可从存档列表中选择任一历史存档读取（按 `created_at` 倒序展示）。房间存档列表 `GET /api/rooms/:id/save-states` 仅返回与房间**当前** `emulator_type` + `rom_id` 匹配的存档，避免展示其他游戏的存档；房间未选 ROM 时列表为空。
+> **多存档槽 + 管理**: 每次存档新建一条记录，房主可从存档列表中选择任一历史存档读取（按 `created_at` 倒序展示），也可对存档**重命名**（`POST /api/rooms/rename-save-state`）、**删除**（`POST /api/rooms/delete-save-state`），或一键**加载最新存档**（`POST /api/rooms/load-latest-state`，取当前机种+ROM 的最新一条）。房间存档列表 `GET /api/rooms/:id/save-states` 仅返回与房间**当前** `emulator_type` + `rom_id` 匹配的存档，避免展示其他游戏的存档；房间未选 ROM 时列表为空。
 >
 > **序列化数据流转**: EmuRunner 与外部无直接对象存储/DB 能力，存档数据经 Worker 中转（共享目录 `/tmp/cloudemu/{room_id}/` + LiveKit control DataChannel）。详见 architecture.md §7 与 §8。
 

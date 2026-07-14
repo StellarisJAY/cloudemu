@@ -19,6 +19,9 @@ import type {
   SaveState,
   SaveStateReq,
   LoadStateReq,
+  LoadLatestStateReq,
+  RenameSaveStateReq,
+  DeleteSaveStateReq,
 } from '@/types/api'
 
 export const roomApi = {
@@ -105,5 +108,20 @@ export const roomApi = {
   /** GET /api/rooms/:id/save-states — 列出房间存档 */
   listSaveStates(roomId: string) {
     return client.get<ApiResponse<SaveState[]>>(`/rooms/${roomId}/save-states`)
+  },
+
+  /** POST /api/rooms/load-latest-state — 房主加载最新存档 */
+  loadLatestState(data: LoadLatestStateReq) {
+    return client.post<ApiResponse<null>>('/rooms/load-latest-state', data)
+  },
+
+  /** POST /api/rooms/rename-save-state — 房主重命名存档 */
+  renameSaveState(data: RenameSaveStateReq) {
+    return client.post<ApiResponse<null>>('/rooms/rename-save-state', data)
+  },
+
+  /** POST /api/rooms/delete-save-state — 房主删除存档 */
+  deleteSaveState(data: DeleteSaveStateReq) {
+    return client.post<ApiResponse<null>>('/rooms/delete-save-state', data)
   },
 }

@@ -34,9 +34,13 @@ func (s *stubRoomPlayerRepo) ByRoomAndUser(ctx context.Context, roomID, userID u
 
 type stubSaveStateRepo struct {
 	contract.SaveStateRepo
-	byID    *model.SaveState
-	created *model.SaveState
-	list    []model.SaveState
+	byID      *model.SaveState
+	created   *model.SaveState
+	list      []model.SaveState
+	latest    *model.SaveState
+	renamedID uuid.UUID
+	renamedTo string
+	deletedID uuid.UUID
 }
 
 func (s *stubSaveStateRepo) Create(ctx context.Context, ss *model.SaveState) error {
@@ -56,8 +60,24 @@ func (s *stubSaveStateRepo) ListByRoomRom(ctx context.Context, roomID uuid.UUID,
 	return s.list, nil
 }
 
+func (s *stubSaveStateRepo) LatestByRoomRom(ctx context.Context, roomID uuid.UUID, emulatorType string, romID uuid.UUID) (*model.SaveState, error) {
+	return s.latest, nil
+}
+
+func (s *stubSaveStateRepo) Rename(ctx context.Context, id uuid.UUID, name string) error {
+	s.renamedID = id
+	s.renamedTo = name
+	return nil
+}
+
+func (s *stubSaveStateRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	s.deletedID = id
+	return nil
+}
+
 type stubMinio struct {
 	contract.MinioFunc
+	removedPath string
 }
 
 func (s *stubMinio) PresignedPutURL(ctx context.Context, bucket, path string, expiry time.Duration) (string, error) {
@@ -68,11 +88,16 @@ func (s *stubMinio) PresignedGetURL(ctx context.Context, bucket, path string, ex
 	return "http://minio/get", nil
 }
 
+func (s *stubMinio) RemoveFile(ctx context.Context, bucket, path string) error {
+	s.removedPath = path
+	return nil
+}
+
 type stubWorkerClient struct {
 	contract.WorkerClient
-	saveSize    int64
-	loadCalled  bool
-	saveCalled  bool
+	saveSize   int64
+	loadCalled bool
+	saveCalled bool
 }
 
 func (s *stubWorkerClient) SaveState(ctx context.Context, workerAddr string, roomID, saveStateID uuid.UUID, uploadURL string) (int64, error) {
@@ -241,6 +266,143 @@ func TestRoomService_ListSaveStates(t *testing.T) {
 		}
 		if len(list) != 0 {
 			t.Errorf("未选 ROM 应返回空，得到 %d", len(list))
+		}
+	})
+}
+
+// ---- LoadLatestState 测试 ----
+
+func TestRoomService_LoadLatestState(t *testing.T) {
+	hostID := uuid.Must(uuid.NewV7())
+	otherID := uuid.Must(uuid.NewV7())
+	roomID := uuid.Must(uuid.NewV7())
+	romID := uuid.Must(uuid.NewV7())
+
+	playingRoom := &model.Room{ID: roomID, HostID: hostID, EmulatorType: "nes", RomID: &romID, Status: 1, WorkerAddr: "1.2.3.4:9090"}
+	latest := &model.SaveState{ID: uuid.Must(uuid.NewV7()), RoomID: roomID, EmulatorType: "nes", RomID: romID, MinioPath: "savestate/x.dat"}
+
+	t.Run("非房主", func(t *testing.T) {
+		svc := &RoomService{
+			roomRepo:      &stubRoomRepo{room: playingRoom},
+			saveStateRepo: &stubSaveStateRepo{latest: latest},
+			minioFunc:     &stubMinio{},
+			workerClient:  &stubWorkerClient{},
+			bucket:        "cloudemu",
+		}
+		if err := svc.LoadLatestState(context.Background(), otherID, roomID); err != apperror.ErrNotRoomHost {
+			t.Fatalf("err = %v, want ErrNotRoomHost", err)
+		}
+	})
+
+	t.Run("无存档", func(t *testing.T) {
+		svc := &RoomService{
+			roomRepo:      &stubRoomRepo{room: playingRoom},
+			saveStateRepo: &stubSaveStateRepo{latest: nil},
+			minioFunc:     &stubMinio{},
+			workerClient:  &stubWorkerClient{},
+			bucket:        "cloudemu",
+		}
+		if err := svc.LoadLatestState(context.Background(), hostID, roomID); err != apperror.ErrSaveStateNotExist {
+			t.Fatalf("err = %v, want ErrSaveStateNotExist", err)
+		}
+	})
+
+	t.Run("正常加载最新", func(t *testing.T) {
+		wc := &stubWorkerClient{}
+		svc := &RoomService{
+			roomRepo:      &stubRoomRepo{room: playingRoom},
+			saveStateRepo: &stubSaveStateRepo{latest: latest},
+			minioFunc:     &stubMinio{},
+			workerClient:  wc,
+			bucket:        "cloudemu",
+		}
+		if err := svc.LoadLatestState(context.Background(), hostID, roomID); err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if !wc.loadCalled {
+			t.Error("期望调用 Worker LoadState")
+		}
+	})
+}
+
+// ---- RenameSaveState 测试 ----
+
+func TestRoomService_RenameSaveState(t *testing.T) {
+	hostID := uuid.Must(uuid.NewV7())
+	otherID := uuid.Must(uuid.NewV7())
+	roomID := uuid.Must(uuid.NewV7())
+	ssID := uuid.Must(uuid.NewV7())
+
+	room := &model.Room{ID: roomID, HostID: hostID}
+	ss := &model.SaveState{ID: ssID, RoomID: roomID}
+	req := func() contract.RenameSaveStateReq {
+		return contract.RenameSaveStateReq{RoomID: &roomID, SaveStateID: &ssID, Name: "关卡3"}
+	}
+
+	t.Run("非房主", func(t *testing.T) {
+		svc := &RoomService{roomRepo: &stubRoomRepo{room: room}, saveStateRepo: &stubSaveStateRepo{byID: ss}}
+		if err := svc.RenameSaveState(context.Background(), otherID, req()); err != apperror.ErrNotRoomHost {
+			t.Fatalf("err = %v, want ErrNotRoomHost", err)
+		}
+	})
+
+	t.Run("存档不存在", func(t *testing.T) {
+		svc := &RoomService{roomRepo: &stubRoomRepo{room: room}, saveStateRepo: &stubSaveStateRepo{byID: nil}}
+		if err := svc.RenameSaveState(context.Background(), hostID, req()); err != apperror.ErrSaveStateNotExist {
+			t.Fatalf("err = %v, want ErrSaveStateNotExist", err)
+		}
+	})
+
+	t.Run("正常重命名", func(t *testing.T) {
+		ssRepo := &stubSaveStateRepo{byID: ss}
+		svc := &RoomService{roomRepo: &stubRoomRepo{room: room}, saveStateRepo: ssRepo}
+		if err := svc.RenameSaveState(context.Background(), hostID, req()); err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if ssRepo.renamedID != ssID || ssRepo.renamedTo != "关卡3" {
+			t.Errorf("重命名参数错误：id=%v name=%q", ssRepo.renamedID, ssRepo.renamedTo)
+		}
+	})
+}
+
+// ---- DeleteSaveState 测试 ----
+
+func TestRoomService_DeleteSaveState(t *testing.T) {
+	hostID := uuid.Must(uuid.NewV7())
+	otherID := uuid.Must(uuid.NewV7())
+	roomID := uuid.Must(uuid.NewV7())
+	ssID := uuid.Must(uuid.NewV7())
+
+	room := &model.Room{ID: roomID, HostID: hostID}
+	ss := &model.SaveState{ID: ssID, RoomID: roomID, MinioPath: "savestate/room/x.dat"}
+	req := contract.DeleteSaveStateReq{RoomID: &roomID, SaveStateID: &ssID}
+
+	t.Run("非房主", func(t *testing.T) {
+		svc := &RoomService{roomRepo: &stubRoomRepo{room: room}, saveStateRepo: &stubSaveStateRepo{byID: ss}, minioFunc: &stubMinio{}}
+		if err := svc.DeleteSaveState(context.Background(), otherID, req); err != apperror.ErrNotRoomHost {
+			t.Fatalf("err = %v, want ErrNotRoomHost", err)
+		}
+	})
+
+	t.Run("存档不存在", func(t *testing.T) {
+		svc := &RoomService{roomRepo: &stubRoomRepo{room: room}, saveStateRepo: &stubSaveStateRepo{byID: nil}, minioFunc: &stubMinio{}}
+		if err := svc.DeleteSaveState(context.Background(), hostID, req); err != apperror.ErrSaveStateNotExist {
+			t.Fatalf("err = %v, want ErrSaveStateNotExist", err)
+		}
+	})
+
+	t.Run("正常删除（清MinIO+删记录）", func(t *testing.T) {
+		ssRepo := &stubSaveStateRepo{byID: ss}
+		mn := &stubMinio{}
+		svc := &RoomService{roomRepo: &stubRoomRepo{room: room}, saveStateRepo: ssRepo, minioFunc: mn}
+		if err := svc.DeleteSaveState(context.Background(), hostID, req); err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if mn.removedPath != ss.MinioPath {
+			t.Errorf("未删除 MinIO 对象，removedPath=%q", mn.removedPath)
+		}
+		if ssRepo.deletedID != ssID {
+			t.Errorf("未删除记录，deletedID=%v", ssRepo.deletedID)
 		}
 	})
 }

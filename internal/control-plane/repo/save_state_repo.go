@@ -54,3 +54,29 @@ func (r *SaveStateRepo) ListByRoomRom(ctx context.Context, roomID uuid.UUID, emu
 		Find(&states).Error
 	return states, err
 }
+
+// LatestByRoomRom 查询房间+机种+ROM 三者匹配的最新一条存档，无匹配时返回 (nil, nil)
+func (r *SaveStateRepo) LatestByRoomRom(ctx context.Context, roomID uuid.UUID, emulatorType string, romID uuid.UUID) (*model.SaveState, error) {
+	var ss model.SaveState
+	err := r.db.WithContext(ctx).
+		Where("room_id = ? AND emulator_type = ? AND rom_id = ?", roomID, emulatorType, romID).
+		Order("created_at DESC").
+		First(&ss).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &ss, err
+}
+
+// Rename 修改存档名称
+func (r *SaveStateRepo) Rename(ctx context.Context, id uuid.UUID, name string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.SaveState{}).
+		Where("id = ?", id).
+		Update("name", name).Error
+}
+
+// Delete 删除存档记录
+func (r *SaveStateRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&model.SaveState{}).Error
+}

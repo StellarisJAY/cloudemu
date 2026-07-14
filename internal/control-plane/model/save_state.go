@@ -13,6 +13,7 @@ import (
 type SaveState struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`                             // 存档唯一标识
 	RoomID       uuid.UUID `gorm:"type:uuid;not null;index" json:"room_id"`                    // 所属房间（不随房间关闭而删除）
+	Name         string    `gorm:"type:varchar(64);not null" json:"name"`                      // 存档名称（房主可改名，默认按创建时间生成）
 	EmulatorType string    `gorm:"type:varchar(32);not null" json:"emulator_type"`             // 模拟器类型：nes / gb / dos
 	RomID        uuid.UUID `gorm:"type:uuid;not null;index" json:"rom_id"`                     // 存档对应的 ROM
 	MinioPath    string    `gorm:"type:varchar(512);not null" json:"-"`                        // MinIO 上的状态二进制路径（不暴露给前端）

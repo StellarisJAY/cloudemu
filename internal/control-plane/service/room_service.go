@@ -746,6 +746,7 @@ func (s *RoomService) SaveState(ctx context.Context, hostID uuid.UUID, roomID uu
 	ss := &model.SaveState{
 		ID:           saveStateID,
 		RoomID:       roomID,
+		Name:         time.Now().Format("2006-01-02 15:04:05"),
 		EmulatorType: room.EmulatorType,
 		RomID:        *room.RomID,
 		MinioPath:    minioPath,
@@ -796,19 +797,117 @@ func (s *RoomService) LoadState(ctx context.Context, hostID uuid.UUID, req contr
 		return apperror.ErrSaveStateMismatch
 	}
 
-	// 生成预签名 GET URL，Worker 用它下载状态二进制
+	return s.loadStateToWorker(ctx, room, ss)
+}
+
+// LoadLatestState 房主加载当前机种+ROM 的最新存档
+// 流程：校验房主 + 房间 playing + 已选 ROM → 取最新存档 → 通知 Worker 反序列化
+func (s *RoomService) LoadLatestState(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) error {
+	room, err := s.roomRepo.ByID(ctx, roomID)
+	if err != nil || room == nil {
+		return apperror.ErrRoomNotExist
+	}
+	if room.HostID != hostID {
+		return apperror.ErrNotRoomHost
+	}
+	if room.Status != 1 {
+		return apperror.ErrRoomNotPlaying
+	}
+	if room.RomID == nil {
+		return apperror.ErrRomNotSelected
+	}
+	if room.WorkerAddr == "" {
+		return apperror.ErrWorkerUnavailable
+	}
+
+	ss, err := s.saveStateRepo.LatestByRoomRom(ctx, roomID, room.EmulatorType, *room.RomID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+	if ss == nil {
+		return apperror.ErrSaveStateNotExist
+	}
+
+	return s.loadStateToWorker(ctx, room, ss)
+}
+
+// loadStateToWorker 生成预签名 GET URL 并通知 Worker 下载 + 令 EmuRunner 反序列化
+func (s *RoomService) loadStateToWorker(ctx context.Context, room *model.Room, ss *model.SaveState) error {
 	downloadURL, err := s.minioFunc.PresignedGetURL(ctx, s.bucket, ss.MinioPath, 5*time.Minute)
 	if err != nil {
-		slog.Error("failed to generate presigned get url", "room_id", roomID, "error", err)
+		slog.Error("failed to generate presigned get url", "room_id", room.ID, "error", err)
 		return apperror.ErrInternal
 	}
 
-	if err := s.workerClient.LoadState(ctx, room.WorkerAddr, roomID, saveStateID, downloadURL); err != nil {
-		slog.Error("worker LoadState failed", "room_id", roomID, "error", err)
+	if err := s.workerClient.LoadState(ctx, room.WorkerAddr, room.ID, ss.ID, downloadURL); err != nil {
+		slog.Error("worker LoadState failed", "room_id", room.ID, "error", err)
 		return apperror.ErrLoadStateFailed
 	}
 
-	slog.Info("save state loaded", "room_id", roomID, "save_state_id", saveStateID)
+	slog.Info("save state loaded", "room_id", room.ID, "save_state_id", ss.ID)
+	return nil
+}
+
+// RenameSaveState 房主重命名存档
+func (s *RoomService) RenameSaveState(ctx context.Context, hostID uuid.UUID, req contract.RenameSaveStateReq) error {
+	roomID := *req.RoomID
+	saveStateID := *req.SaveStateID
+
+	room, err := s.roomRepo.ByID(ctx, roomID)
+	if err != nil || room == nil {
+		return apperror.ErrRoomNotExist
+	}
+	if room.HostID != hostID {
+		return apperror.ErrNotRoomHost
+	}
+
+	ss, err := s.saveStateRepo.ByID(ctx, saveStateID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+	if ss == nil || ss.RoomID != roomID {
+		return apperror.ErrSaveStateNotExist
+	}
+
+	if err := s.saveStateRepo.Rename(ctx, saveStateID, req.Name); err != nil {
+		slog.Error("failed to rename save state", "save_state_id", saveStateID, "error", err)
+		return apperror.ErrInternal
+	}
+	return nil
+}
+
+// DeleteSaveState 房主删除存档（先删 MinIO 二进制，再删数据库记录）
+func (s *RoomService) DeleteSaveState(ctx context.Context, hostID uuid.UUID, req contract.DeleteSaveStateReq) error {
+	roomID := *req.RoomID
+	saveStateID := *req.SaveStateID
+
+	room, err := s.roomRepo.ByID(ctx, roomID)
+	if err != nil || room == nil {
+		return apperror.ErrRoomNotExist
+	}
+	if room.HostID != hostID {
+		return apperror.ErrNotRoomHost
+	}
+
+	ss, err := s.saveStateRepo.ByID(ctx, saveStateID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+	if ss == nil || ss.RoomID != roomID {
+		return apperror.ErrSaveStateNotExist
+	}
+
+	// 先删 MinIO 二进制，失败仅记录日志不阻断（避免残留记录导致无法删除）
+	if err := s.minioFunc.RemoveFile(ctx, s.bucket, ss.MinioPath); err != nil {
+		slog.Warn("failed to remove save state object", "save_state_id", saveStateID, "path", ss.MinioPath, "error", err)
+	}
+
+	if err := s.saveStateRepo.Delete(ctx, saveStateID); err != nil {
+		slog.Error("failed to delete save state", "save_state_id", saveStateID, "error", err)
+		return apperror.ErrInternal
+	}
+
+	slog.Info("save state deleted", "room_id", roomID, "save_state_id", saveStateID)
 	return nil
 }
 

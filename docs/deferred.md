@@ -128,10 +128,8 @@ ROM 的 `status` 字段支持 `0=pending, 1=approved, 2=rejected`，但管理审
 
 ## 7. 存档 / 读档增强
 
-手动存档/读档已实现（房主在 PlayView 侧边栏操作，见 architecture.md §8.7、db.md `save_states`）。以下增强延后：
+手动存档/读档、存档改名、删除存档、加载最新存档均已实现（房主在 PlayView 侧边栏操作，见 architecture.md §8.7、db.md `save_states`）。以下增强延后：
 
 - **自动定时存档**: architecture.md 曾设想 EmuRunner 每 60s 自动 `retro_serialize`。MVP 仅做房主手动存档，自动定时存档（写入 MinIO 的频率/去重/淘汰策略）留待后续。
-- **删除存档**: 当前仅支持新增 + 列表 + 读取，删除单条存档 API 待后续。
-- **存档备注名**: 当前仅按时间戳展示，允许房主命名存档待后续。
 - **每房间存档数量上限 / 自动淘汰最旧**: 当前不限量，超限淘汰策略待后续。
 - **故障恢复**: Worker 宕机后基于最近存档恢复会话（见 §1，Phase 3）。

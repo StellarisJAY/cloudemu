@@ -27,6 +27,7 @@ defineEmits<{
   stop: []
   saveState: []
   loadState: []
+  loadLatestState: []
   connect: []
   keyMappingSaved: []
 }>()
@@ -164,6 +165,14 @@ const connectionBtnType: Record<ConnectionState, string> = {
           </n-button>
           <n-button v-if="emulatorState === 'running'" block secondary @click="$emit('saveState')">
             💾 存档
+          </n-button>
+          <n-button
+            v-if="emulatorState === 'running' || emulatorState === 'paused'"
+            block
+            secondary
+            @click="$emit('loadLatestState')"
+          >
+            ⏪ 加载最新存档
           </n-button>
           <n-button
             v-if="emulatorState === 'running' || emulatorState === 'paused'"

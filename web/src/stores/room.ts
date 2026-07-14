@@ -293,6 +293,62 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
+  async function loadLatestState(roomId: string): Promise<string | null> {
+    try {
+      const res = await roomApi.loadLatestState({ room_id: roomId })
+      if (res.data.code !== 0) {
+        return res.data.message || '读档失败'
+      }
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，读档失败'
+      }
+      return '网络错误，读档失败'
+    }
+  }
+
+  async function renameSaveState(
+    roomId: string,
+    saveStateId: string,
+    name: string,
+  ): Promise<string | null> {
+    try {
+      const res = await roomApi.renameSaveState({
+        room_id: roomId,
+        save_state_id: saveStateId,
+        name,
+      })
+      if (res.data.code !== 0) {
+        return res.data.message || '重命名失败'
+      }
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，重命名失败'
+      }
+      return '网络错误，重命名失败'
+    }
+  }
+
+  async function deleteSaveState(roomId: string, saveStateId: string): Promise<string | null> {
+    try {
+      const res = await roomApi.deleteSaveState({ room_id: roomId, save_state_id: saveStateId })
+      if (res.data.code !== 0) {
+        return res.data.message || '删除失败'
+      }
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，删除失败'
+      }
+      return '网络错误，删除失败'
+    }
+  }
+
   return {
     rooms,
     loading,
@@ -313,5 +369,8 @@ export const useRoomStore = defineStore('room', () => {
     saveState,
     loadState,
     listSaveStates,
+    loadLatestState,
+    renameSaveState,
+    deleteSaveState,
   }
 })

@@ -286,6 +286,23 @@ function handleLoadState() {
   showSaveStateDialog.value = true
 }
 
+const loadingLatest = ref(false)
+
+async function handleLoadLatestState() {
+  if (loadingLatest.value) return
+  loadingLatest.value = true
+  try {
+    const err = await roomStore.loadLatestState(roomId)
+    if (err) {
+      message.error(err)
+      return
+    }
+    message.success('已加载最新存档')
+  } finally {
+    loadingLatest.value = false
+  }
+}
+
 async function handleRoleChange(userId: string, role: PlayerRole, port?: number) {
   let err: string | null
   if (role === 1) {
@@ -371,6 +388,7 @@ function handleLeave() {
           @stop="handleStop"
           @save-state="handleSaveState"
           @load-state="handleLoadState"
+          @load-latest-state="handleLoadLatestState"
           @connect="handleConnect"
           @key-mapping-saved="gameInput.reloadMapping"
         />
@@ -438,6 +456,7 @@ function handleLeave() {
             @stop="handleStop"
             @save-state="handleSaveState"
             @load-state="handleLoadState"
+            @load-latest-state="handleLoadLatestState"
             @connect="handleConnect"
             @key-mapping-saved="gameInput.reloadMapping"
           />

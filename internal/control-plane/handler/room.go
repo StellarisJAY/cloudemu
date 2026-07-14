@@ -326,3 +326,57 @@ func (h *RoomHandler) ListSaveStates(c *gin.Context) {
 
 	response.OK(c, states)
 }
+
+// LoadLatestState POST /api/rooms/load-latest-state — 房主加载最新存档（需登录）
+func (h *RoomHandler) LoadLatestState(c *gin.Context) {
+	var req contract.LoadLatestStateReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	hostID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.svc.LoadLatestState(c.Request.Context(), hostID, *req.RoomID); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
+// RenameSaveState POST /api/rooms/rename-save-state — 房主重命名存档（需登录）
+func (h *RoomHandler) RenameSaveState(c *gin.Context) {
+	var req contract.RenameSaveStateReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	hostID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.svc.RenameSaveState(c.Request.Context(), hostID, req); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
+// DeleteSaveState POST /api/rooms/delete-save-state — 房主删除存档（需登录）
+func (h *RoomHandler) DeleteSaveState(c *gin.Context) {
+	var req contract.DeleteSaveStateReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	hostID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.svc.DeleteSaveState(c.Request.Context(), hostID, req); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.OK(c, nil)
+}
