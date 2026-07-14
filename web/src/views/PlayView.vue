@@ -499,6 +499,9 @@ function handleLeave() {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* 移动端浏览器工具栏会占用高度，100vh 会超出可视区导致底部被裁切；
+     用动态视口高度 dvh 让布局严格贴合当前屏幕可视范围 */
+  height: 100dvh;
   background: var(--color-bg-primary);
   overflow: hidden;
 }

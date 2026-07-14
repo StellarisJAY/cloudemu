@@ -48,6 +48,7 @@
 .play-body-mobile {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: #000;
 }
@@ -61,9 +62,10 @@
   background: rgba(0, 0, 0, 0.3);
 }
 
-/* 视频区域在移动端撑满剩余空间 */
+/* 视频区域在移动端撑满剩余空间，min-height/width:0 保证能收缩到屏幕内 */
 .play-body-mobile .game-screen {
   min-width: 0;
+  min-height: 0;
 }
 
 /* ── 移动端 header 微调 ── */

@@ -17,6 +17,7 @@
   "dependencies": {
     "@vueuse/core": "^14.3.0",
     "axios": "^1.16.1",
+    "cropperjs": "^1.6.2",
     "go-captcha-vue": "^2.0.6",
     "livekit-client": "^2.19.2",
     "naive-ui": "^2.44.1",

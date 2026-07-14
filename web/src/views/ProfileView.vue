@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useMessage, type FormInst, type FormRules, type UploadFileInfo } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { fileUrl } from '@/utils/url'
+import AvatarCropperDialog from '@/components/common/AvatarCropperDialog.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -64,11 +65,30 @@ const passwordRules: FormRules = {
 }
 
 /* ── 头像上传 ── */
+/** 选中的原始图片，待送入裁剪弹窗 */
+const cropSource = ref<File | null>(null)
+const showCropper = ref(false)
+
+/** 选择图片后不直接使用，先打开裁剪弹窗 */
 function handleAvatarChange(options: { file: UploadFileInfo; fileList: UploadFileInfo[] }) {
   const file = options.file.file
   if (!file) return
+  cropSource.value = file
+  showCropper.value = true
+}
+
+/** 裁剪完成：暂存裁剪后的文件并生成预览 */
+function handleAvatarCropped(file: File) {
+  handleAvatarRemove()
   avatarFile.value = file
   avatarPreview.value = URL.createObjectURL(file)
+  showCropper.value = false
+  cropSource.value = null
+}
+
+function handleCropperClose() {
+  showCropper.value = false
+  cropSource.value = null
 }
 
 function handleAvatarRemove() {
@@ -189,6 +209,14 @@ onMounted(async () => {
           </n-button>
         </div>
       </div>
+
+      <!-- 头像裁剪弹窗 -->
+      <AvatarCropperDialog
+        :show="showCropper"
+        :file="cropSource"
+        @cropped="handleAvatarCropped"
+        @close="handleCropperClose"
+      />
 
       <!-- 个人信息表单 -->
       <n-form ref="profileFormRef" :model="profileModel" :rules="profileRules" class="auth-form">
