@@ -55,7 +55,7 @@ touchstart/touchmove/touchend (multi-touch, identifier 追踪)
 
 ### 为什么这样设计
 
-1. **三段式而非叠加式**：NES/GBA 模拟器核心用户已经习惯 Delta 风格的左右分区。触摸叠加会遮挡画面像素，对于需要精确定位的平台游戏不可接受。
+1. **三段式而非叠加式**：NES/GB 模拟器核心用户已经习惯 Delta 风格的左右分区。触摸叠加会遮挡画面像素，对于需要精确定位的平台游戏不可接受。
 2. **全功能抽屉而非裁减**：房主在移动端仍需要选 ROM、管理成员、分配端口。裁掉这些功能意味着手机用户无法独立主持房间。
 3. **复用输入协议不改动**：`useGameInput.ts` 的 60Hz RAF + 4-byte 协议是已有且经过测试的通路，虚拟手柄只需把触控状态映射到同一个 `ButtonName` bitset。
 
@@ -65,7 +65,7 @@ touchstart/touchmove/touchend (multi-touch, identifier 追踪)
 
 ### 不成立就死
 
-- [ ] **WebRTC 视频流在移动端 60fps 流畅** — 用真机测试 LiveKit 远端视频轨在以下浏览器上的帧率和延迟：Safari iOS、Chrome Android、微信内置浏览器。**验证方式**: `useLiveKit.ts:23` 视频轨连接后，在移动端测试 3 款 NES/GBA 游戏的实际帧率感知。
+- [ ] **WebRTC 视频流在移动端 60fps 流畅** — 用真机测试 LiveKit 远端视频轨在以下浏览器上的帧率和延迟：Safari iOS、Chrome Android、微信内置浏览器。**验证方式**: `useLiveKit.ts:23` 视频轨连接后，在移动端测试 3 款 NES/GB 游戏的实际帧率感知。
 - [ ] **多指触控能可靠追踪 2+ 指同时操作** — `touchstart/touchmove/touchend` 的 `touch.identifier` 在快速切换时是否丢事件？"按住右 + 按 A" 同时操作时，手指从一个 D-pad 方向滑到另一个时状态转换是否正确？**验证方式**: 写一个独立 touch-debug 页面，实时渲染所有 touch point 位置和 identifier，测试极限操作（方向快速切换 + 按键连打）。
 - [ ] **虚拟 D-pad 玩 NES 平台跳跃可接受** — 无物理反馈的触摸方向键在需要精准跳跃的游戏中（如马里奥、洛克人），用户是否在 5 分钟内放弃？**验证方式**: 内部试玩 3 款 NES 游戏各 10 分钟，记录主观体验和实际通关率。
 

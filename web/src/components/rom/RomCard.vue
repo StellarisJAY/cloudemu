@@ -17,7 +17,7 @@ const emulatorLabels: Record<EmulatorType, string> = {
 
 const emulatorCover: Record<EmulatorType, string> = {
   nes: '/assets/default-cover-nes.png',
-  gba: '/assets/default-cover-gba.png',
+  gb: '/assets/default-cover-gb.png',
   dos: '/assets/default-cover-dos.png',
 }
 
@@ -85,7 +85,7 @@ function formatSize(bytes: number): string {
 .cover-nes {
   background: #636363;
 }
-.cover-gba {
+.cover-gb {
   background: #4a148c;
 }
 .cover-dos {

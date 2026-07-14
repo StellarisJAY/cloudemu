@@ -378,7 +378,7 @@ CREATE TABLE rooms (
     id             UUID PRIMARY KEY,
     host_id        UUID         NOT NULL,
     title          VARCHAR(128) NOT NULL,
-    emulator_type  VARCHAR(32)  NOT NULL,           -- 'nes', 'gba', 'dos'
+    emulator_type  VARCHAR(32)  NOT NULL,           -- 'nes', 'gb', 'dos'
     rom_id         UUID,                            -- 关联 ROM，NULL=房主尚未选择 ROM
     max_ports      SMALLINT     NOT NULL DEFAULT 4, -- 最大手柄端口数
     status         SMALLINT     NOT NULL DEFAULT 0, -- 0:waiting, 1:playing, 2:closed
@@ -484,7 +484,7 @@ CREATE INDEX ix_roms_sha256   ON roms (sha256);
 
 > **ROM 隔离**: `roms` 没有全局唯一索引。即使两个用户上传了同一个文件（相同 sha256），也会存储为两条独立记录，各自通过 `uploader_id` 隔离。`sha256` 索引仅用于同一用户去重。
 >
-> **封面图处理**: `cover_path` 为 NULL 时，前端根据 `emulator_type` 展示默认封面（如 NES 灰色卡带、GBA 白色卡带图标、DOS 深绿色磁盘图标）。覆盖图由用户在 ROM 上传时选择文件一起提交，存储到 MinIO 的 `cover/{uploader_id}/{rom_id}.{ext}` 路径。
+> **封面图处理**: `cover_path` 为 NULL 时，前端根据 `emulator_type` 展示默认封面（如 NES 灰色卡带、GB 白色卡带图标、DOS 深绿色磁盘图标）。覆盖图由用户在 ROM 上传时选择文件一起提交，存储到 MinIO 的 `cover/{uploader_id}/{rom_id}.{ext}` 路径。
 
 ---
 
@@ -693,7 +693,7 @@ GET /api/roms  → 查当前用户的 ROM:
 | emulator_type | 默认封面 |
 |---------------|---------|
 | `nes` | `/assets/default-cover-nes.png` |
-| `gba` | `/assets/default-cover-gba.png` |
+| `gb` | `/assets/default-cover-gb.png` |
 | `dos` | `/assets/default-cover-dos.png` |
 
 ### 上传 ROM 带封面的请求

@@ -30,7 +30,7 @@ type StartGameRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`                   // 房间 ID（UUIDv7 字符串），同时也是 LiveKit 房间名
 	RomPath       string                 `protobuf:"bytes,2,opt,name=rom_path,json=romPath,proto3" json:"rom_path,omitempty"`                // MinIO 中的 ROM 文件路径（仅供日志/调试）
-	EmulatorType  string                 `protobuf:"bytes,3,opt,name=emulator_type,json=emulatorType,proto3" json:"emulator_type,omitempty"` // 模拟器类型："nes" / "gba" / "dos"
+	EmulatorType  string                 `protobuf:"bytes,3,opt,name=emulator_type,json=emulatorType,proto3" json:"emulator_type,omitempty"` // 模拟器类型："nes" / "gb" / "dos"
 	MaxPorts      int32                  `protobuf:"varint,4,opt,name=max_ports,json=maxPorts,proto3" json:"max_ports,omitempty"`            // 最大手柄端口数（最多4人），决定 DataChannel 数量
 	RomUrl        string                 `protobuf:"bytes,5,opt,name=rom_url,json=romUrl,proto3" json:"rom_url,omitempty"`                   // MinIO 预签名下载 URL，Worker 用于下载 ROM 文件到本地临时目录
 	HostUserId    string                 `protobuf:"bytes,6,opt,name=host_user_id,json=hostUserId,proto3" json:"host_user_id,omitempty"`     // 房主用户 ID，Worker 据此生成房主的独立 player token

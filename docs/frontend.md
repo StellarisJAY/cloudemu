@@ -51,7 +51,7 @@ web/
 ├── public/
 │   └── assets/
 │       ├── default-cover-nes.png
-│       └── default-cover-gba.png
+│       └── default-cover-gb.png
 │
 └── src/
     ├── main.ts

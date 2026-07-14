@@ -216,6 +216,22 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
+  async function leaveRoom(roomId: string): Promise<string | null> {
+    try {
+      const res = await roomApi.leave({ room_id: roomId })
+      if (res.data.code !== 0) {
+        return res.data.message || '退出失败'
+      }
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，退出失败'
+      }
+      return '网络错误，退出失败'
+    }
+  }
+
   async function deleteRoom(roomId: string): Promise<string | null> {
     try {
       const res = await roomApi.deleteRoom({ room_id: roomId })
@@ -247,6 +263,7 @@ export const useRoomStore = defineStore('room', () => {
     pauseGame,
     resumeGame,
     stopGame,
+    leaveRoom,
     deleteRoom,
   }
 })

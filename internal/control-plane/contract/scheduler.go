@@ -40,7 +40,7 @@ type StartGameRequest struct {
 	RomPath      string    // MinIO 中的 ROM 路径（仅供日志/调试）
 	RomURL       string    // MinIO 预签名下载 URL，Worker 用于下载 ROM 文件到本地临时目录
 	HostUserID   uuid.UUID // 房主用户 ID，Worker 据此生成房主专属 player token
-	EmulatorType string    // 模拟器类型："nes" | "gba" | "dos"
+	EmulatorType string    // 模拟器类型："nes" | "gb" | "dos"
 	MaxPorts     int32     // 最大手柄端口数
 }
 

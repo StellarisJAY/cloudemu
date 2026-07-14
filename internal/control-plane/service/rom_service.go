@@ -36,7 +36,7 @@ func NewRomService(romRepo contract.RomRepo, minioFunc contract.MinioFunc, minio
 // maxSizeByEmulator 各模拟器类型对应的ROM文件大小上限（字节）
 var maxSizeByEmulator = map[string]int64{
 	"nes": 2 * 1024 * 1024,   // NES ROM 最大 2MB
-	"gba": 32 * 1024 * 1024,  // GBA ROM 最大 32MB
+	"gb": 32 * 1024 * 1024,   // GB/GBC/GBA ROM 最大 32MB
 	"dos": 256 * 1024 * 1024, // DOS ROM 最大 256MB（dosbox 加载 zip 镜像）
 }
 

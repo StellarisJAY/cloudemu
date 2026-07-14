@@ -44,7 +44,7 @@ service WorkerAgent {
 message StartGameRequest {
   string room_id = 1;        // 房间 ID（UUIDv7 字符串），同时也是 LiveKit 房间名
   string rom_path = 2;       // MinIO 中的 ROM 文件路径（仅供日志/调试）
-  string emulator_type = 3;  // 模拟器类型："nes" / "gba" / "dos"
+  string emulator_type = 3;  // 模拟器类型："nes" / "gb" / "dos"
   int32 max_ports = 4;       // 最大手柄端口数（最多4人），决定 DataChannel 数量
   string rom_url = 5;        // MinIO 预签名下载 URL，Worker 用于下载 ROM 文件到本地临时目录
   string host_user_id = 6;   // 房主用户 ID，Worker 据此生成房主的独立 player token

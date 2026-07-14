@@ -87,7 +87,7 @@ type UpdatePasswordReq struct {
 // CreateRoomReq 创建房间请求
 type CreateRoomReq struct {
 	Title        string      `json:"title"         binding:"required,max=128"`           // 房间名称
-	EmulatorType string      `json:"emulator_type" binding:"required,oneof=nes gba dos"` // 模拟器类型：nes / gba / dos
+	EmulatorType string      `json:"emulator_type" binding:"required,oneof=nes gb dos"` // 模拟器类型：nes / gb / dos
 	RomID        *uuid.UUID  `json:"rom_id"`                                             // 要游玩的ROM ID（可选，进入房间后再选择）
 	MaxPorts     int16       `json:"max_ports"     binding:"required,min=1,max=4"`       // 最大手柄端口数
 	InviteeIDs   []uuid.UUID `json:"invitee_ids"`                                        // 邀请的好友ID列表（可选）

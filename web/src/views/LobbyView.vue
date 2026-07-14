@@ -34,6 +34,16 @@ const pendingDeleteRoomId = ref<string | null>(null)
 
 const deletingRoom = computed(() => roomStore.rooms.find((r) => r.id === pendingDeleteRoomId.value))
 
+const showStopConfirm = ref(false)
+const pendingStopRoomId = ref<string | null>(null)
+
+const stoppingRoom = computed(() => roomStore.rooms.find((r) => r.id === pendingStopRoomId.value))
+
+const showLeaveConfirm = ref(false)
+const pendingLeaveRoomId = ref<string | null>(null)
+
+const leavingRoom = computed(() => roomStore.rooms.find((r) => r.id === pendingLeaveRoomId.value))
+
 function handleRoomDelete(roomId: string) {
   pendingDeleteRoomId.value = roomId
   showDeleteConfirm.value = true
@@ -50,6 +60,42 @@ async function confirmDelete() {
   }
   showDeleteConfirm.value = false
   pendingDeleteRoomId.value = null
+}
+
+function handleRoomStop(roomId: string) {
+  pendingStopRoomId.value = roomId
+  showStopConfirm.value = true
+}
+
+async function confirmStop() {
+  if (!pendingStopRoomId.value) return
+  const err = await roomStore.stopGame(pendingStopRoomId.value)
+  if (err) {
+    message.error(err)
+  } else {
+    message.success('游戏已停止')
+    await roomStore.fetchRooms()
+  }
+  showStopConfirm.value = false
+  pendingStopRoomId.value = null
+}
+
+function handleRoomLeave(roomId: string) {
+  pendingLeaveRoomId.value = roomId
+  showLeaveConfirm.value = true
+}
+
+async function confirmLeave() {
+  if (!pendingLeaveRoomId.value) return
+  const err = await roomStore.leaveRoom(pendingLeaveRoomId.value)
+  if (err) {
+    message.error(err)
+  } else {
+    message.success('已退出房间')
+    await roomStore.fetchRooms()
+  }
+  showLeaveConfirm.value = false
+  pendingLeaveRoomId.value = null
 }
 
 onMounted(() => {
@@ -95,6 +141,8 @@ function handleRomEdited() {
     @create="showCreateRoom = true"
     @room-click="handleRoomClick"
     @room-delete="handleRoomDelete"
+    @room-stop="handleRoomStop"
+    @room-leave="handleRoomLeave"
     @upload="showUploadRom = true"
     @rom-click="handleRomClick"
   />
@@ -132,7 +180,9 @@ function handleRomEdited() {
             :current-user-id="auth.user?.id"
             @create="showCreateRoom = true"
             @room-click="handleRoomClick"
-            @room-delete="handleRoomDelete"
+@room-delete="handleRoomDelete"
+            @room-stop="handleRoomStop"
+            @room-leave="handleRoomLeave"
           />
         </div>
 
@@ -191,6 +241,54 @@ function handleRomEdited() {
       </p>
       <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
         所有房间成员和关联数据都将被永久删除，且无法恢复。
+      </p>
+    </n-modal>
+
+    <!-- 停止游戏确认 -->
+    <n-modal
+      v-model:show="showStopConfirm"
+      preset="dialog"
+      title="停止游戏"
+      positive-text="确认停止"
+      negative-text="取消"
+      type="warning"
+      @positive-click="confirmStop"
+      @negative-click="()=>{
+        showStopConfirm = false
+        pendingStopRoomId = null
+      }
+      "
+    >
+      <p>
+        确定要停止房间「<strong>{{ stoppingRoom?.title }}</strong
+        >」的游戏吗？
+      </p>
+      <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
+        游戏将立即结束，所有玩家的游戏进度将丢失。
+      </p>
+    </n-modal>
+
+    <!-- 退出房间确认 -->
+    <n-modal
+      v-model:show="showLeaveConfirm"
+      preset="dialog"
+      title="退出房间"
+      positive-text="确认退出"
+      negative-text="取消"
+      type="warning"
+      @positive-click="confirmLeave"
+      @negative-click="()=>{
+        showLeaveConfirm = false
+        pendingLeaveRoomId = null
+      }
+      "
+    >
+      <p>
+        确定要退出房间「<strong>{{ leavingRoom?.title }}</strong
+        >」吗？
+      </p>
+      <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
+        你将退出此房间，如果当前正在游戏中，你的游戏画面将断开。
       </p>
     </n-modal>
 </template>

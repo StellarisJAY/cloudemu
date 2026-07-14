@@ -41,9 +41,9 @@ watch(
 )
 
 const emulatorOptions = [
-  { label: 'NES', value: 'nes' as const },
-  { label: 'GBC/GBA', value: 'gba' as const },
-  { label: 'DOS', value: 'dos' as const },
+  { label: 'NES', value: 'nes' as EmulatorType },
+  { label: 'GBC/GBA', value: 'gb' as EmulatorType },
+  { label: 'DOS', value: 'dos' as EmulatorType },
 ]
 
 const portOptions = [

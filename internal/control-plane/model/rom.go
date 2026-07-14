@@ -13,7 +13,7 @@ type Rom struct {
 	UploaderID   uuid.UUID `gorm:"type:uuid;not null;index" json:"-"`                          // 上传者ID（不暴露给前端，仅后端过滤用）
 	Title        string    `gorm:"type:varchar(255);not null" json:"title"`                    // ROM 标题，用户自定义
 	FileName     string    `gorm:"type:varchar(255);not null" json:"-"`                        // 原始文件名（不暴露）
-	EmulatorType string    `gorm:"type:varchar(32);not null;index" json:"emulator_type"`       // 模拟器类型：nes, gba, dos
+	EmulatorType string    `gorm:"type:varchar(32);not null;index" json:"emulator_type"`       // 模拟器类型：nes, gb, dos
 	FileSize     int64     `gorm:"type:bigint;not null" json:"file_size"`                      // 文件大小（字节）
 	SHA256       string    `gorm:"type:varchar(64);not null;index" json:"-"`                   // 文件 SHA-256 哈希值（不暴露）
 	Status       int16     `gorm:"type:smallint;not null;default:0;index" json:"status"`       // ROM 状态：0=待审核, 1=已通过(可用), 2=已拒绝

@@ -12,6 +12,8 @@ defineEmits<{
   create: []
   'room-click': [roomId: string]
   'room-delete': [roomId: string]
+  'room-stop': [roomId: string]
+  'room-leave': [roomId: string]
 }>()
 </script>
 
@@ -37,6 +39,8 @@ defineEmits<{
         :current-user-id="currentUserId"
         @click="$emit('room-click', room.id)"
         @delete="$emit('room-delete', room.id)"
+        @stop="$emit('room-stop', room.id)"
+        @leave="$emit('room-leave', room.id)"
       />
     </div>
   </div>

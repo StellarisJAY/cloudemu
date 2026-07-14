@@ -20,6 +20,8 @@ defineEmits<{
   create: []
   'room-click': [roomId: string]
   'room-delete': [roomId: string]
+  'room-stop': [roomId: string]
+  'room-leave': [roomId: string]
   upload: []
   'rom-click': [romId: string]
 }>()
@@ -58,6 +60,8 @@ const activeTab = ref<Tab>('rooms')
           @create="$emit('create')"
           @room-click="(id: string) => $emit('room-click', id)"
           @room-delete="(id: string) => $emit('room-delete', id)"
+          @room-stop="(id: string) => $emit('room-stop', id)"
+          @room-leave="(id: string) => $emit('room-leave', id)"
         />
       </section>
 

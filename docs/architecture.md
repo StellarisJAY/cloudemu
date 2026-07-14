@@ -2,10 +2,10 @@
 
 ## 1. 项目概述
 
-在服务端模拟 NES、GBA 等游戏机硬件，通过 WebRTC 实时流传输到浏览器展示（云游戏模式）。支持多人远程同玩（多手柄映射）、分布式扩展、低延迟低带宽。优先实现 2D 复古游戏机。
+在服务端模拟 NES、GB 等游戏机硬件，通过 WebRTC 实时流传输到浏览器展示（云游戏模式）。支持多人远程同玩（多手柄映射）、分布式扩展、低延迟低带宽。优先实现 2D 复古游戏机。
 
 ### 核心目标
-- 多机种模拟（NES → GBA → 逐步扩展）
+- 多机种模拟（NES → GB → 逐步扩展）
 - 浏览器端零安装，WebRTC 拉流
 - 多人游戏：多手柄独立输入，共享游戏画面
 - 分布式架构，Worker 节点弹性伸缩
@@ -81,8 +81,8 @@
 | 层 | 技术 | 理由 |
 |----|------|------|
 | 后端语言 | **Go** | 编译单二进制，并发友好，适合容器化，网络库成熟，代码统一 |
-| 模拟器封装 | **Go (cgo)** | 通过 dlopen 动态加载 libretro C 内核，cgo 开销对 NES/GBA 可忽略 |
-| 模拟器内核 | **libretro** | 统一 API 覆盖 200+ 内核（NES: FCEUmm/Mesen, GBA: mGBA） |
+| 模拟器封装 | **Go (cgo)** | 通过 dlopen 动态加载 libretro C 内核，cgo 开销对 NES/GB 可忽略 |
+| 模拟器内核 | **libretro** | 统一 API 覆盖 200+ 内核（NES: FCEUmm/Mesen, GB: mGBA） |
 | 数据库 | **PostgreSQL** | 持久化用户/ROM 元数据/会话记录 |
 | 缓存/会话状态 | **Redis** | 会话元数据、端口锁、存档暂存、调度状态 |
 | 对象存储 | **MinIO** | S3 兼容，单机/集群皆可，存 ROM + SaveState |
@@ -99,8 +99,8 @@
 ## 4. ROM 上传
 
 - ROM 上传至 MinIO，SHA-256 去重（同用户不可重复上传同一文件）
-- **模拟器类型检测**: MVP 阶段仅根据文件扩展名判断（`.nes` / `.gba`），不做魔数校验
-- **上传限制**: NES < 2MB, GBA < 32MB
+- **模拟器类型检测**: MVP 阶段仅根据文件扩展名判断（`.nes` / `.gba` / `.gbc`），不做魔数校验
+- **上传限制**: NES < 2MB, GB < 32MB
 - ROM 审核功能留待后续设计（见 docs/deferred.md）
 
 ---
@@ -143,12 +143,12 @@ Go(cgo) → dlopen 加载内核 → 注册回调 → retro_run() 驱动帧循环
 | 机种 | 推荐内核 | 分辨率 | 帧率 | 音频 | 单核心承载量 |
 |------|---------|--------|------|------|------------|
 | NES | FCEUmm / Mesen | 256×240 | 60fps | 单声道 | ~20~50 会话 |
-| GBA | mGBA | 240×160 | 60fps | 立体声 | ~20~50 会话 |
+| GB | mGBA | 240×160 | 60fps | 立体声 | ~20~50 会话 |
 
 ### 5.4 编码参数
 
-- **视频**: x264 `veryfast` preset, 自适应码率 NES 100~800kbps / GBA 200~1500kbps
-- **音频**: Opus, 单声道 (NES) / 立体声 (GBA), 64~96kbps
+- **视频**: x264 `veryfast` preset, 自适应码率 NES 100~800kbps / GB 200~1500kbps
+- **音频**: Opus, 单声道 (NES) / 立体声 (GB), 64~96kbps
 - **自适应**: 丢包 2% 以上触发降帧/降码率
 
 ### 5.5 EmuRunner 运行模型
@@ -259,7 +259,7 @@ Go 通过 cgo 动态加载 libretro 内核（`dlopen`），获取函数符号后
      e. 启动 EmuRunner 子进程（传入本地 ROM 路径 + token + backend_type）
   6. 房主收到响应 → Redis 存入 {token, url, room} → 前端跳转 PlayView
      a. 用 token 连接 LiveKit 房间
-     b. dlopen 加载 libretro 内核（NES/GBA）
+     b. dlopen 加载 libretro 内核（NES/GB）
      c. 通过 os.Open() 加载本地 ROM 文件
      d. 启动帧循环 + 编码管线 → 视频/音频 Track 发布到 LiveKit SFU
      e. 订阅 DataChannel 接收玩家手柄输入 → retro_input_state 回调
@@ -489,7 +489,7 @@ RoomService.Start(roomID):
 ### 9.6 设计约束
 
 - **不做会话迁移/重调度**: 已运行的 EmuRunner 不移动，只调度新会话
-- **不按模拟器类型分权**: NES 与 GBA 的资源消耗差异不够大，MVP 不区分
+- **不按模拟器类型分权**: NES 与 GB 的资源消耗差异不够大，MVP 不区分
 - **CPU/内存仅作监控**: 不参与调度评分，避免启动初期 CPU 虚高误导调度器
 - **权重由 Worker 自报**: Control Plane 不假设 Worker 硬件配置
 

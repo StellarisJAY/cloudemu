@@ -11,23 +11,50 @@ const props = defineProps<{
 const emit = defineEmits<{
   click: [roomId: string]
   delete: [roomId: string]
+  stop: [roomId: string]
+  leave: [roomId: string]
 }>()
 
 const isHost = computed(() => props.currentUserId != null && props.currentUserId === props.room.host_id)
 
-const showMore = computed(() => isHost.value && props.room.status === 0)
+const showMore = computed(() => {
+  if (props.room.status === 0 && isHost.value) return true
+  if (props.room.status === 1) return true
+  return false
+})
 
-const menuOptions = computed<DropdownOption[]>(() => [
-  {
-    key: 'delete',
-    label: () =>
-      h('span', { style: { color: '#ef4444' } }, '删除房间'),
-  },
-])
+const menuOptions = computed<DropdownOption[]>(() => {
+  if (props.room.status === 0) {
+    return [
+      {
+        key: 'delete',
+        label: () => h('span', { style: { color: '#ef4444' } }, '删除房间'),
+      },
+    ]
+  }
+  if (isHost.value) {
+    return [
+      {
+        key: 'stop',
+        label: () => h('span', { style: { color: '#ef4444' } }, '停止游戏'),
+      },
+    ]
+  }
+  return [
+    {
+      key: 'leave',
+      label: () => h('span', { style: { color: '#ef4444' } }, '退出房间'),
+    },
+  ]
+})
 
 function handleMenuSelect(key: string) {
   if (key === 'delete') {
     emit('delete', props.room.id)
+  } else if (key === 'stop') {
+    emit('stop', props.room.id)
+  } else if (key === 'leave') {
+    emit('leave', props.room.id)
   }
 }
 
@@ -99,7 +126,7 @@ const emulatorCover: Record<EmulatorType, string> = {
 .cover-nes {
   background: #636363;
 }
-.cover-gba {
+.cover-gb {
   background: #4a148c;
 }
 .cover-dos {

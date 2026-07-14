@@ -140,7 +140,7 @@ cloudemu/
    │   ├── public/
    │   │   └── assets/
    │   │       ├── default-cover-nes.png    # NES 默认封面
-   │   │       └── default-cover-gba.png   # GBA 默认封面
+   │   │       └── default-cover-gb.png   # GB 默认封面
    │   │
    │   └── src/
    │       ├── main.ts                     # Vue 应用入口
@@ -340,7 +340,7 @@ type ResetPasswordReq struct {
 // 房间
 type CreateRoomReq struct {
     Title        string      `json:"title"         binding:"required,max=128"`
-    EmulatorType string      `json:"emulator_type" binding:"required,oneof=nes gba dos"`
+    EmulatorType string      `json:"emulator_type" binding:"required,oneof=nes gb dos"`
     RomID        uuid.UUID   `json:"rom_id"        binding:"required"`
     MaxPorts     int16       `json:"max_ports"     binding:"required,min=1,max=4"`
     InviteeIDs   []uuid.UUID `json:"invitee_ids"`
