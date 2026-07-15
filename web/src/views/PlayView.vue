@@ -217,68 +217,93 @@ async function handleSelectRom(romId: string) {
   message.success(`已选择 ${currentRom.value?.title ?? romId}`)
 }
 
-function handleStartGame() {
-  ;(async () => {
-    try {
-      const resp = await roomStore.startGame(roomId)
-      if (!resp) {
-        message.error('开始游戏失败：未收到服务器响应')
-        return
-      }
-      livekitToken.value = resp.livekit_token
-      livekitRoom.value = resp.livekit_room
-      livekitUrl.value = resp.livekit_url
-      await livekit.connect(resp.livekit_url, resp.livekit_token)
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '开始游戏失败'
-      message.error(msg)
+async function handleStartGame() {
+  if (buttonLoading.value) return
+  buttonLoading.value = 'start'
+  try {
+    const resp = await roomStore.startGame(roomId)
+    if (!resp) {
+      message.error('开始游戏失败：未收到服务器响应')
+      return
     }
-  })()
+    livekitToken.value = resp.livekit_token
+    livekitRoom.value = resp.livekit_room
+    livekitUrl.value = resp.livekit_url
+    await livekit.connect(resp.livekit_url, resp.livekit_token)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '开始游戏失败'
+    message.error(msg)
+  } finally {
+    buttonLoading.value = null
+  }
 }
 
 async function handlePause() {
-  const err = await roomStore.pauseGame(roomId)
-  if (err) {
-    message.error(err)
-    return
+  if (buttonLoading.value) return
+  buttonLoading.value = 'pause'
+  try {
+    const err = await roomStore.pauseGame(roomId)
+    if (err) {
+      message.error(err)
+      return
+    }
+    emulatorState.value = 'paused'
+    fps.value = 0
+  } finally {
+    buttonLoading.value = null
   }
-  emulatorState.value = 'paused'
-  fps.value = 0
 }
 
 async function handleResume() {
-  const err = await roomStore.resumeGame(roomId)
-  if (err) {
-    message.error(err)
-    return
+  if (buttonLoading.value) return
+  buttonLoading.value = 'resume'
+  try {
+    const err = await roomStore.resumeGame(roomId)
+    if (err) {
+      message.error(err)
+      return
+    }
+    emulatorState.value = 'running'
+    fps.value = 60
+  } finally {
+    buttonLoading.value = null
   }
-  emulatorState.value = 'running'
-  fps.value = 60
 }
 
 async function handleStop() {
-  const err = await roomStore.stopGame(roomId)
-  if (err) {
-    message.error(err)
-    return
+  if (buttonLoading.value) return
+  buttonLoading.value = 'stop'
+  try {
+    const err = await roomStore.stopGame(roomId)
+    if (err) {
+      message.error(err)
+      return
+    }
+    message.success('游戏已停止')
+    await livekit.disconnect()
+    emulatorState.value = 'idle'
+    fps.value = 0
+    cpuPercent.value = 0
+    currentRomId.value = undefined
+    router.push('/')
+  } finally {
+    buttonLoading.value = null
   }
-  message.success('游戏已停止')
-  await livekit.disconnect()
-  emulatorState.value = 'idle'
-  fps.value = 0
-  cpuPercent.value = 0
-  currentRomId.value = undefined
-  router.push('/')
 }
 
-function handleSaveState() {
-  roomStore.saveState(roomId).then((err) => {
+async function handleSaveState() {
+  if (buttonLoading.value) return
+  buttonLoading.value = 'saveState'
+  try {
+    const err = await roomStore.saveState(roomId)
     if (err) {
       message.error(err)
       return
     }
     message.success('存档已保存')
-  })
+  } finally {
+    buttonLoading.value = null
+  }
 }
 
 const showSaveStateDialog = ref(false)
@@ -287,11 +312,13 @@ function handleLoadState() {
   showSaveStateDialog.value = true
 }
 
-const loadingLatest = ref(false)
+/** 按钮操作的加载状态，防止重复点击并为按钮提供 loading 动画 */
+type ControlAction = 'start' | 'pause' | 'resume' | 'stop' | 'saveState' | 'loadLatestState' | null
+const buttonLoading = ref<ControlAction>(null)
 
 async function handleLoadLatestState() {
-  if (loadingLatest.value) return
-  loadingLatest.value = true
+  if (buttonLoading.value) return
+  buttonLoading.value = 'loadLatestState'
   try {
     const err = await roomStore.loadLatestState(roomId)
     if (err) {
@@ -300,7 +327,7 @@ async function handleLoadLatestState() {
     }
     message.success('已加载最新存档')
   } finally {
-    loadingLatest.value = false
+    buttonLoading.value = null
   }
 }
 
@@ -382,6 +409,7 @@ function handleLeave() {
           :cpu-percent="cpuPercent"
           :connection-state="connectionState"
           :latency-ms="latencyMs"
+          :button-loading="buttonLoading"
           @select-rom="handleSelectRom"
           @start-game="handleStartGame"
           @pause="handlePause"
@@ -453,6 +481,7 @@ function handleLeave() {
             :cpu-percent="cpuPercent"
             :connection-state="connectionState"
             :latency-ms="latencyMs"
+            :button-loading="buttonLoading"
             @select-rom="handleSelectRom"
             @start-game="handleStartGame"
             @pause="handlePause"

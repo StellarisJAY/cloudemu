@@ -17,6 +17,8 @@ const props = defineProps<{
   cpuPercent: number
   connectionState: ConnectionState
   latencyMs?: number | null
+  /** 当前正在执行的操作，null 表示空闲；用于按钮 loading 动画和防重复点击 */
+  buttonLoading?: string | null
 }>()
 
 defineEmits<{
@@ -37,6 +39,9 @@ const currentRom = computed(() => props.roms.find((r) => r.id === props.currentR
 const message = useMessage()
 
 const showKeyMapping = ref(false)
+
+/** 是否有控制操作正在执行中，所有控制按钮在此时禁用 */
+const isBusy = computed(() => props.buttonLoading != null && props.buttonLoading !== '')
 
 const stateLabels: Record<string, string> = {
   idle: '就绪',
@@ -138,11 +143,20 @@ const connectionBtnType: Record<ConnectionState, string> = {
             v-if="(emulatorState === 'idle' || emulatorState === 'error') && roomStatus === 0"
             block
             type="primary"
+            :disabled="isBusy"
+            :loading="buttonLoading === 'start'"
             @click="$emit('startGame')"
           >
             🚀 开始游戏
           </n-button>
-          <n-button v-if="emulatorState === 'running'" block secondary @click="$emit('pause')">
+          <n-button
+            v-if="emulatorState === 'running'"
+            block
+            secondary
+            :disabled="isBusy"
+            :loading="buttonLoading === 'pause'"
+            @click="$emit('pause')"
+          >
             ⏯ 暂停
           </n-button>
           <n-button
@@ -150,6 +164,8 @@ const connectionBtnType: Record<ConnectionState, string> = {
             block
             secondary
             type="primary"
+            :disabled="isBusy"
+            :loading="buttonLoading === 'resume'"
             @click="$emit('resume')"
           >
             ▶ 继续
@@ -159,17 +175,28 @@ const connectionBtnType: Record<ConnectionState, string> = {
             block
             secondary
             type="warning"
+            :disabled="isBusy"
+            :loading="buttonLoading === 'stop'"
             @click="$emit('stop')"
           >
             ⏹ 停止
           </n-button>
-          <n-button v-if="emulatorState === 'running'" block secondary @click="$emit('saveState')">
+          <n-button
+            v-if="emulatorState === 'running'"
+            block
+            secondary
+            :disabled="isBusy"
+            :loading="buttonLoading === 'saveState'"
+            @click="$emit('saveState')"
+          >
             💾 存档
           </n-button>
           <n-button
             v-if="emulatorState === 'running' || emulatorState === 'paused'"
             block
             secondary
+            :disabled="isBusy"
+            :loading="buttonLoading === 'loadLatestState'"
             @click="$emit('loadLatestState')"
           >
             ⏪ 加载最新存档
@@ -178,6 +205,7 @@ const connectionBtnType: Record<ConnectionState, string> = {
             v-if="emulatorState === 'running' || emulatorState === 'paused'"
             block
             secondary
+            :disabled="isBusy"
             @click="$emit('loadState')"
           >
             📂 读档
