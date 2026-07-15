@@ -94,6 +94,17 @@ func (r *Runner) Resume(ctx context.Context) {
 	}
 }
 
+// AudioChannels 根据模拟器类型返回音频声道数
+// NES=1（单声道），GB/DOS=2（立体声）
+func (r *Runner) AudioChannels() int {
+	switch r.Type {
+	case backend.BackEndTypeNES:
+		return 1
+	default:
+		return 2
+	}
+}
+
 // 共享目录中的存档/读档文件名（Worker 与 EmuRunner 同主机共享 /tmp/cloudemu/{room_id}/）
 const (
 	saveStateFile = "state.dat" // EmuRunner 序列化写入

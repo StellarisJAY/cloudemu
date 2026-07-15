@@ -89,6 +89,12 @@ type LibretroBackend struct {
 	inputProvider InputProvider // 玩家输入查询接口，nil 时所有按钮始终返回 0
 
 	ScaleFactor int // 整数倍 nearest-neighbor 放大系数，1 表示不放大
+
+	// 音频 PCM 缓冲与通道
+	audioBuf       []int16 // PCM 累积缓冲区
+	audioChan      chan []int16 // 满一帧后发送到此通道
+	audioFrameSize int // 每个 Opus 帧应累积的 int16 样本数（sampleRate * latencyMs / 1000 * channels）
+	audioChannels  int // 声道数（1=单声道，2=立体声）
 }
 
 // InputProvider 玩家输入查询接口，由上层 InputManager 实现
@@ -119,6 +125,7 @@ type LibretroSystemAVInfo struct {
 func NewBackend() *LibretroBackend {
 	return &LibretroBackend{
 		frameOutputChan: make(chan *image.YCbCr, 1),
+		audioChan:       make(chan []int16, 8),
 		firstFrame:      true,
 		ScaleFactor:     1, // 默认不放大，由上层按需设置
 	}
@@ -256,6 +263,20 @@ func (lb *LibretroBackend) GetSysAVInfo() {
 
 func (lb *LibretroBackend) FrameChan() chan *image.YCbCr {
 	return lb.frameOutputChan
+}
+
+// AudioChan 返回音频输出通道，每次发送一个 Opus 帧所需 PCM 数据（[]int16 交错样本）
+func (lb *LibretroBackend) AudioChan() chan []int16 {
+	return lb.audioChan
+}
+
+// SetAudioConfig 配置音频参数（必须在 Init() 之后、Run() 之前调用）
+// sampleRate: 采样率（Hz），从 retro_system_av_info 获取，通常 48000
+// channels: 声道数，1=单声道（NES），2=立体声（GB/DOS）
+// latencyMs: Opus 帧时长（毫秒），默认 20
+func (lb *LibretroBackend) SetAudioConfig(sampleRate float64, channels int, latencyMs int) {
+	lb.audioChannels = channels
+	lb.audioFrameSize = int(sampleRate) * latencyMs * channels / 1000
 }
 
 // SetInputProvider 注入玩家输入查询接口
@@ -463,8 +484,34 @@ func goAudioSampleCB(left C.int16_t, right C.int16_t) {
 
 //export goAudioSampleBatchCB
 func goAudioSampleBatchCB(data unsafe.Pointer, frames C.size_t) C.size_t {
-	_ = currentBackend
-	// TODO
+	lb := currentBackend
+	if lb == nil || lb.audioChan == nil || lb.audioFrameSize == 0 {
+		return frames
+	}
+	channels := lb.audioChannels
+	if channels == 0 {
+		channels = 2 // 默认立体声
+	}
+	n := int(frames) * channels
+	if n == 0 {
+		return frames
+	}
+	// 复制 C 内存中的 int16 PCM 数据到 Go 切片
+	pcm := unsafe.Slice((*int16)(data), n)
+	for _, v := range pcm {
+		lb.audioBuf = append(lb.audioBuf, v)
+	}
+	// 累积满一帧后发送到通道（非阻塞，避免阻塞 C 回调）
+	for len(lb.audioBuf) >= lb.audioFrameSize {
+		chunk := make([]int16, lb.audioFrameSize)
+		copy(chunk, lb.audioBuf[:lb.audioFrameSize])
+		lb.audioBuf = lb.audioBuf[lb.audioFrameSize:]
+		select {
+		case lb.audioChan <- chunk:
+		default:
+			// 通道满则丢弃，防止 C 回调阻塞
+		}
+	}
 	return frames
 }
 

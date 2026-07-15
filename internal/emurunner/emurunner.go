@@ -14,6 +14,7 @@ import (
 type Instance struct {
 	runner           *Runner
 	videoEncoder     *X264Encoder
+	audioEncoder     *OpusEncoder
 	publisher        *LiveKitPublisher
 	inputMgr         *InputManager
 	connectedMembers map[string]*lksdk.RemoteParticipant
@@ -33,8 +34,33 @@ func NewInstance(config LiveKitConfig, emulatorType backend.Type, hostIdentity s
 	instance.inputMgr = NewInputManager(hostIdentity)
 	instance.publisher = NewLiveKitPublisher(config, instance.inputMgr)
 	instance.videoEncoder = NewX264Encoder()
+	instance.audioEncoder = NewOpusEncoder()
 	instance.runner = NewRunner(emulatorType)
 	return instance
+}
+
+// normalizeOpusSampleRate 将 libretro 核心报告的采样率标准化为 Opus 支持的合法值
+// Opus 编码器要求: 8000, 12000, 16000, 24000, 48000 Hz
+// 部分 libretro 核心返回 0 或 44100 等非标准值，需映射到最近的合法值
+func normalizeOpusSampleRate(rate int) int {
+	valid := []int{8000, 12000, 16000, 24000, 48000}
+	if rate <= 0 {
+		return 48000
+	}
+	best := valid[0]
+	for _, v := range valid {
+		if abs(rate-v) < abs(rate-best) {
+			best = v
+		}
+	}
+	return best
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func (instance *Instance) InitRunner(path string) error {
@@ -87,6 +113,16 @@ func (instance *Instance) InitPublisher() error {
 	if err := instance.videoEncoder.Init(encW, encH); err != nil {
 		return fmt.Errorf("emurunner init video encoder error: %w", err)
 	}
+	// 初始化音频编码器
+	rawRate := int(instance.runner.backend.AVInfo.SampleRate)
+	sampleRate := normalizeOpusSampleRate(rawRate)
+	channels := instance.runner.AudioChannels()
+	latencyMs := 20 // 20ms Opus 帧
+	slog.Info("init audio encoder", "libretroRate", rawRate, "normalizedRate", sampleRate, "channels", channels)
+	instance.runner.backend.SetAudioConfig(float64(sampleRate), channels, latencyMs)
+	if err := instance.audioEncoder.Init(sampleRate, channels); err != nil {
+		return fmt.Errorf("emurunner init audio encoder error: %w", err)
+	}
 	return nil
 }
 
@@ -100,6 +136,8 @@ func (instance *Instance) Run(ctx context.Context) {
 func (instance *Instance) EncoderLoop(ctx context.Context) {
 	encW := instance.runner.backend.AVInfo.BaseWidth * instance.runner.backend.ScaleFactor
 	encH := instance.runner.backend.AVInfo.BaseHeight * instance.runner.backend.ScaleFactor
+	sampleRate := normalizeOpusSampleRate(int(instance.runner.backend.AVInfo.SampleRate))
+	audioChannels := instance.runner.AudioChannels()
 	for {
 		select {
 		case <-ctx.Done():
@@ -114,6 +152,15 @@ func (instance *Instance) EncoderLoop(ctx context.Context) {
 			// 发布到房间的视频轨道
 			if err := instance.publisher.WriteVideoSample(sample); err != nil {
 				slog.Error("write video sample failed", "error", err)
+			}
+		case pcm := <-instance.runner.backend.AudioChan(): // 接受模拟器线程的音频帧
+			sample, err := instance.audioEncoder.Encode(pcm, sampleRate, audioChannels)
+			if err != nil {
+				slog.Error("encode audio failed", "error", err)
+				continue
+			}
+			if err := instance.publisher.WriteAudioSample(sample); err != nil {
+				slog.Error("write audio sample failed", "error", err)
 			}
 		}
 	}
