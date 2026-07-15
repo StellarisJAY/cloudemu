@@ -34,8 +34,10 @@ cloudemu/
 ├── cmd/
 │   ├── control-plane/
 │   │   └── main.go                     # 主控平面入口 + 依赖注入装配
-│   └── worker/                         # Worker Agent 节点
-│       └── main.go                     # Worker 入口（Redis 自注册 + 心跳 + gRPC Server 启动）
+│   ├── worker/                         # Worker Agent 节点
+│   │   └── main.go                     # Worker 入口（Redis 自注册 + 心跳 + gRPC Server 启动）
+│   └── emurunner/                      # EmuRunner 子进程（由 Worker 启动）
+│       └── main.go                     # EmuRunner 入口（libretro 内核 + LiveKit 推流 + stdin 管道命令）
 │
 ├── proto/                              # gRPC Proto 定义
 │   └── worker.proto                    # WorkerAgent 服务定义：StartGame / StopGame / SessionStatus
@@ -101,8 +103,8 @@ cloudemu/
     │   │   ├── config.go                   # Worker 独立配置（gRPC 地址、Redis、LiveKit、EmuRunner 路径）
     │   │   ├── heartbeat.go                # Redis 心跳注册 + 负载上报
     │   │   ├── grpc/                       # gRPC Server 实现
-    │   │   │   └── server.go               # StartGame / StopGame / SessionStatus 实现
-    │   │   ├── process.go                  # EmuRunner 子进程管理（启动/停止/监控）
+    │   │   │   └── server.go               # StartGame/StopGame/GeneratePlayerToken + 管道命令转发
+    │   │   ├── process.go                  # EmuRunner 子进程管理（启动/停止/监控）+ stdin/stdout 管道通信
     │   │   └── livekit.go                  # LiveKit 房间创建 + Token 生成
    │   │
    │   ├── proto/                           # 生成的 protobuf 代码
@@ -110,6 +112,65 @@ cloudemu/
    │   │       ├── worker.pb.go             # protobuf 消息序列化（protoc-gen-go 生成）
    │   │       └── worker_grpc.pb.go        # gRPC 客户端/服务端 stub（protoc-gen-go-grpc 生成）
    │   │
+   │   ├── emurunner/                       # 模拟器运行时（libretro 内核封装 + LiveKit 推流）
+   │   │   ├── backend/                     # libretro C 语言桥接（dlopen/dlsym）
+   │   │   │   ├── backend.go               # Go 端后端封装（Init/Deinit/LoadGameFile/Run/Serialize）
+   │   │   │   ├── loader.c                 # C 桥接实现（dlopen、函数指针缓存、Go 回调转发）
+   │   │   │   ├── loader.h                 # C 桥接头文件
+   │   │   │   └── libretro.h               # libretro API 头文件
+   │   │   ├── protocol.go                  # Worker↔EmuRunner 管道协议：Cmd / Resp 结构体 + JSON 标签
+   │   │   ├── cmd.go                       # stdin 命令处理器：HandleCommand + StartCommandReader + writeResp
+   │   │   ├── emurunner.go                 # Instance 主控制器（Runner + Encoder + Publisher 编排）
+   │   │   ├── runner.go                    # Runner — 模拟循环 + 暂停/恢复 + 存档/读档文件 I/O
+   │   │   ├── codec.go                     # X264Encoder(视频) + OpusEncoder(音频) 编码器
+   │   │   ├── publish.go                   # LiveKitPublisher — 房间连接 + 视频/音频轨道发布 + DataChannel(input/ping)
+   │   │   └── input.go                     # InputManager — 玩家按键状态 + 端口映射管理
+
+### Worker ↔ EmuRunner 管道通信
+
+控制消息（pause/resume/port_map/save_state/load_state）已从 LiveKit DataChannel 迁移至 stdin/stdout 管道：
+
+```
+Worker ──[stdin: JSON]──→ EmuRunner 子进程
+Worker ←──[stdout: JSON]── EmuRunner 子进程
+```
+
+**协议**（`internal/emurunner/protocol.go`）：JSONL（每行一个完整 JSON，以 `\n` 结尾）
+
+```go
+// Worker ──→ EmuRunner
+type Cmd struct {
+    Cmd     string         `json:"cmd"`              // pause / resume / port_map / save_state / load_state
+    Mapping map[int]string `json:"mapping,omitempty"` // port_map 时：port → LiveKit identity
+}
+
+// EmuRunner ──→ Worker
+type Resp struct {
+    Cmd     string `json:"cmd"`               // 回显命令名
+    Status  string `json:"status"`            // "ok" | "error"
+    Message string `json:"message,omitempty"` // 错误描述
+    Size    int64  `json:"size,omitempty"`    // save_state 时返回字节数
+}
+```
+
+**数据流**：
+
+| 命令 | 原通道 | 现通道 | Worker 侧 |
+|------|--------|--------|-----------|
+| pause/resume | DataChannel 0x05/0x06 二进制 | stdin JSON | `session.SendCommand(...)` |
+| port_map | DataChannel 0x02 二进制编码 | stdin JSON | `session.SendCommand(...)` |
+| save_state | DataChannel 0x07 + **轮询 state.done** | stdin JSON → 等响应 → 读 state.dat | `SaveStateViaPipe()` |
+| load_state | DataChannel 0x08 + 轮询 load.done | stdin JSON → 等响应 | `LoadStateViaPipe()` |
+| input (0x01) | DataChannel | **保留** DataChannel | 不涉及 |
+| ping/pong (0x03/0x04) | DataChannel | **保留** DataChannel | 不涉及 |
+
+**管道生命周期**：
+- `SessionManager.Start`：通过 `os.Pipe()` 创建 stdin/stdout 管道，设置 `cmd.Stdin`/`cmd.Stdout`
+- `Session.SendCommand`：cmdMu 串行化，写 stdin → 读 stdout 响应
+- `SessionManager.Stop`：先 `closePipes()`（关闭 stdin writer + stdout reader）→ SIGTERM → 清理 workDir
+- EmuRunner 侧：`StartCommandReader()` 以 goroutine 运行，`bufio.Scanner` 循环读取 stdin，`HandleCommand` 分发到 runner 方法
+
+   │
    │   └── pkg/                            # 跨组件共享工具包
    │       ├── apperror/
    │       │   └── error.go                # AppError 统一错误类型 + 32+ 个预定义错误
@@ -252,7 +313,7 @@ handler ──→ contract  ←── service
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `RoomService` | Create, List, InviteToRoom, AssignPort, Start, Leave | 房间业务逻辑；Start 返回 `*StartGameResponse`（含 LiveKit token）；InviteToRoom 直接加入好友（类似微信拉群） |
+| `RoomService` | Create, List, InviteToRoom, ChangeRole, SelectRom, Start, Pause, Resume, Stop, Delete, GetLivekitToken, GetMembers, KickPlayer, Leave, SaveState, LoadState, LoadLatestState, RenameSaveState, DeleteSaveState, ListSaveStates | 房间业务逻辑；Start 返回 `*StartGameResponse`（含 LiveKit token）；InviteToRoom 直接加入好友（类似微信拉群） |
 | `RoomRepo` | Create, ByID, ActiveByUser, UpdateStatus, SetWorkerAddr | 房间表操作；SetWorkerAddr 记录分配到的 Worker |
 | `RoomPlayerRepo` | Create, ActiveByRoom, ActiveByUser, ByRoomAndUser, UpdateRoleAndPort, MarkLeft, TransferHost | 房间座位操作 |
 | `RoomStateCache` | SetPort, RemovePort, GetPorts, ClearRoom | 房间端口映射缓存 |
@@ -266,7 +327,7 @@ handler ──→ contract  ←── service
 |------|------|------|
 | `WorkerRegistry` | ListAlive() → ([]WorkerInfo, error) | 从 Redis SCAN 获取所有存活 Worker |
 | `Scheduler` | SelectWorker(ctx, registry) → (*WorkerInfo, error) | 加权最低负载优先选择 Worker（已实现） |
-| `WorkerClient` | StartGame, StopGame | gRPC 客户端接口，Control Plane 调用 Worker Agent |
+| `WorkerClient` | StartGame, StopGame, GeneratePlayerToken, UpdatePortMapping, PauseGame, ResumeGame, SaveState, LoadState | gRPC 客户端接口，Control Plane 调用 Worker Agent；Worker 通过 stdin 管道（非 DataChannel）转发控制命令到 EmuRunner |
 
 ### contract/rom.go — 2 个接口
 
@@ -759,15 +820,23 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
             auth.GET("/rooms",            h.Room.List)
             auth.POST("/rooms/create",    h.Room.Create)
             auth.POST("/rooms/invite",    h.Room.InviteToRoom)
-            auth.POST("/rooms/assign",    h.Room.AssignPort)
-			auth.POST("/rooms/start",     h.Room.Start)
-			auth.POST("/rooms/leave",     h.Room.Leave)
-			auth.POST("/rooms/save-state",  h.Room.SaveState)      // 房主保存存档
-			auth.POST("/rooms/load-state",  h.Room.LoadState)      // 房主读取存档（三要素匹配校验）
-			auth.POST("/rooms/load-latest-state", h.Room.LoadLatestState)   // 房主加载最新存档
-			auth.POST("/rooms/rename-save-state", h.Room.RenameSaveState)   // 房主重命名存档
-			auth.POST("/rooms/delete-save-state", h.Room.DeleteSaveState)   // 房主删除存档（同时清 MinIO）
-			auth.GET("/rooms/:id/save-states", h.Room.ListSaveStates) // 房间存档列表（成员可查）
+            auth.POST("/rooms/change-role", h.Room.ChangeRole)
+            auth.POST("/rooms/select-rom",  h.Room.SelectRom)
+            auth.POST("/rooms/start",     h.Room.Start)
+            auth.GET("/rooms/:id/members", h.Room.GetMembers)
+            auth.GET("/rooms/:id/livekit", h.Room.GetLivekitToken)
+            auth.POST("/rooms/kick",      h.Room.KickPlayer)
+            auth.POST("/rooms/leave",     h.Room.Leave)
+            auth.POST("/rooms/pause",     h.Room.Pause)
+            auth.POST("/rooms/resume",    h.Room.Resume)
+            auth.POST("/rooms/stop",      h.Room.Stop)
+            auth.POST("/rooms/delete",    h.Room.Delete)
+            auth.POST("/rooms/save-state",  h.Room.SaveState)
+            auth.POST("/rooms/load-state",  h.Room.LoadState)
+            auth.POST("/rooms/load-latest-state", h.Room.LoadLatestState)
+            auth.POST("/rooms/rename-save-state", h.Room.RenameSaveState)
+            auth.POST("/rooms/delete-save-state", h.Room.DeleteSaveState)
+            auth.GET("/rooms/:id/save-states", h.Room.ListSaveStates)
 
             // ROM
             auth.GET("/roms",             h.Rom.List)    // 返回：自有 ROM + 全部平台内置 ROM
@@ -1030,7 +1099,7 @@ os.Exit(1)
 | 文件 | 函数 | 对应端点 |
 |------|------|----------|
 | `auth.ts` | captcha, verifyCaptcha, register, verifyEmail, login, resendCode, refresh, me, updateProfile, updatePassword, forgotPassword, resetPassword | `/auth/*` |
-| `room.ts` | list, create, inviteToRoom, assignPort, start, leave | `/rooms/*` |
+| `room.ts` | list, create, inviteToRoom, changeRole, selectRom, start, getMembers, getLivekitToken, kick, leave, pause, resume, stop, deleteRoom, saveState, loadState, loadLatestState, listSaveStates, renameSaveState, deleteSaveState | `/rooms/*` |
 | `rom.ts` | list, upload | `/roms/*` |
 | `friend.ts` | list, pending, search, add, accept, reject | `/friends/*`, `/users/search` |
 

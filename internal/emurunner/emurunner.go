@@ -82,22 +82,6 @@ func (instance *Instance) InitRunner(path string) error {
 func (instance *Instance) InitPublisher() error {
 	instance.publisher.OnMemberConnect = instance.OnMemberConnect
 	instance.publisher.OnMemberDisconnect = instance.OnMemberDisconnect
-	instance.publisher.OnPause = func() {
-		instance.runner.Pause(context.TODO())
-	}
-	instance.publisher.OnResume = func() {
-		instance.runner.Resume(context.TODO())
-	}
-	instance.publisher.OnSaveState = func() {
-		if err := instance.runner.SaveState(instance.workDir); err != nil {
-			slog.Error("save state failed", "error", err)
-		}
-	}
-	instance.publisher.OnLoadState = func() {
-		if err := instance.runner.LoadState(instance.workDir); err != nil {
-			slog.Error("load state failed", "error", err)
-		}
-	}
 
 	if err := instance.publisher.ConnectRoom(); err != nil {
 		return fmt.Errorf("emurunner connect room error: %w", err)

@@ -47,5 +47,7 @@ func main() {
 	if err := instance.InitPublisher(); err != nil {
 		panic(err)
 	}
+	// 启动 stdin 命令行协议读取协程，接收 Worker 下发的控制命令
+	instance.StartCommandReader()
 	instance.Run(context.Background())
 }

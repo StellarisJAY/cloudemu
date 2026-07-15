@@ -2,8 +2,10 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
+	"github.com/StellarisJAY/cloudemu/internal/emurunner"
 	workerpb "github.com/StellarisJAY/cloudemu/internal/proto/worker"
 	"github.com/StellarisJAY/cloudemu/internal/worker"
 )
@@ -143,120 +145,94 @@ func (s *WorkerServer) GeneratePlayerToken(ctx context.Context, req *workerpb.Ge
 	return &workerpb.GeneratePlayerTokenResponse{Token: token}, nil
 }
 
-// UpdatePortMapping 将最新的 port → player identity 映射编码为 PORT_MAP 二进制包，
-// 通过 LiveKit SendData 以 topic="control" 广播到房间，EmuRunner 收到后更新 InputManager
+// UpdatePortMapping 将最新的 port → player identity 映射通过管道发送给 EmuRunner
+// 替代原有的 DataChannel 二进制编码广播
 func (s *WorkerServer) UpdatePortMapping(ctx context.Context, req *workerpb.UpdatePortMappingRequest) (*workerpb.UpdatePortMappingResponse, error) {
 	roomID := req.GetRoomId()
-	mapping := req.GetMapping()
 
-	// 编码 PORT_MAP 包：[type=0x02][count:1B][entries...]
-	// entry: [port:1B][identity_len:1B][identity_bytes...]
-	totalLen := 2 // type + count
-	for _, identity := range mapping {
-		totalLen += 1 + 1 + len(identity) // port + len + identity_bytes
-	}
-	data := make([]byte, totalLen)
-	data[0] = 0x02 // type prefix
-	data[1] = byte(len(mapping))
-	offset := 2
-	for port, identity := range mapping {
-		data[offset] = byte(port)
-		offset++
-		data[offset] = byte(len(identity))
-		offset++
-		copy(data[offset:], identity)
-		offset += len(identity)
+	session, ok := s.sessions.Get(roomID)
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", roomID)
 	}
 
-	if err := s.livekit.SendDataBroadcast(ctx, roomID, "control", true, data); err != nil {
-		slog.Error("failed to broadcast port mapping", "room_id", roomID, "error", err)
+	mapping := make(map[int]string, len(req.GetMapping()))
+	for port, identity := range req.GetMapping() {
+		mapping[int(port)] = identity
+	}
+
+	if _, err := session.SendCommand(emurunner.Cmd{Cmd: "port_map", Mapping: mapping}); err != nil {
+		slog.Error("port_map via pipe failed", "room_id", roomID, "error", err)
 		return nil, err
 	}
 
-	slog.Info("port mapping broadcasted", "room_id", roomID, "entries", len(mapping))
+	slog.Info("port mapping sent via pipe", "room_id", roomID, "entries", len(mapping))
 	return &workerpb.UpdatePortMappingResponse{}, nil
 }
 
 // PauseGame 暂停游戏模拟器运行
-// 通过 LiveKit DataChannel (topic="control", type=0x05) 发送暂停指令到 EmuRunner
+// 通过 stdin 管道发送 pause 命令到 EmuRunner
 func (s *WorkerServer) PauseGame(ctx context.Context, req *workerpb.PauseGameRequest) (*workerpb.PauseGameResponse, error) {
 	roomID := req.GetRoomId()
 	slog.Info("PauseGame received", "room_id", roomID)
 
-	data := []byte{0x05}
-	if err := s.livekit.SendDataBroadcast(ctx, roomID, "control", true, data); err != nil {
-		slog.Error("failed to broadcast pause command", "room_id", roomID, "error", err)
+	session, ok := s.sessions.Get(roomID)
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", roomID)
+	}
+	if _, err := session.SendCommand(emurunner.Cmd{Cmd: "pause"}); err != nil {
+		slog.Error("pause via pipe failed", "room_id", roomID, "error", err)
 		return nil, err
 	}
 
-	slog.Info("pause command broadcasted", "room_id", roomID)
+	slog.Info("pause command sent via pipe", "room_id", roomID)
 	return &workerpb.PauseGameResponse{}, nil
 }
 
 // ResumeGame 继续游戏模拟器运行
-// 通过 LiveKit DataChannel (topic="control", type=0x06) 发送继续指令到 EmuRunner
+// 通过 stdin 管道发送 resume 命令到 EmuRunner
 func (s *WorkerServer) ResumeGame(ctx context.Context, req *workerpb.ResumeGameRequest) (*workerpb.ResumeGameResponse, error) {
 	roomID := req.GetRoomId()
 	slog.Info("ResumeGame received", "room_id", roomID)
 
-	data := []byte{0x06}
-	if err := s.livekit.SendDataBroadcast(ctx, roomID, "control", true, data); err != nil {
-		slog.Error("failed to broadcast resume command", "room_id", roomID, "error", err)
+	session, ok := s.sessions.Get(roomID)
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", roomID)
+	}
+	if _, err := session.SendCommand(emurunner.Cmd{Cmd: "resume"}); err != nil {
+		slog.Error("resume via pipe failed", "room_id", roomID, "error", err)
 		return nil, err
 	}
 
-	slog.Info("resume command broadcasted", "room_id", roomID)
+	slog.Info("resume command sent via pipe", "room_id", roomID)
 	return &workerpb.ResumeGameResponse{}, nil
 }
 
 // SaveState 保存游戏存档
-// 流程：清理残留标志 → control 广播 0x07（令 EmuRunner 序列化）→ 轮询 state.done → 读文件并 PUT 到 MinIO
+// 流程：通过管道命令 EmuRunner 序列化 → 读取 state.dat → PUT 到 MinIO
 func (s *WorkerServer) SaveState(ctx context.Context, req *workerpb.SaveStateRequest) (*workerpb.SaveStateResponse, error) {
 	roomID := req.GetRoomId()
 	slog.Info("SaveState received", "room_id", roomID, "save_state_id", req.GetSaveStateId())
 
-	// 1. 清理残留存档标志，获取共享工作目录
-	workDir, err := s.sessions.PrepareSaveState(roomID)
+	size, err := s.sessions.SaveStateViaPipe(ctx, roomID, req.GetUploadUrl())
 	if err != nil {
-		slog.Error("prepare save state failed", "room_id", roomID, "error", err)
+		slog.Error("save state via pipe failed", "room_id", roomID, "error", err)
 		return nil, err
 	}
 
-	// 2. control DataChannel 广播 0x07，令 EmuRunner 序列化到共享目录
-	if err := s.livekit.SendDataBroadcast(ctx, roomID, "control", true, []byte{0x07}); err != nil {
-		slog.Error("failed to broadcast save state command", "room_id", roomID, "error", err)
-		return nil, err
-	}
-
-	// 3. 轮询 state.done 完成标志，读取 state.dat 并上传到 MinIO
-	size, err := s.sessions.WaitAndUploadSaveState(ctx, workDir, req.GetUploadUrl())
-	if err != nil {
-		slog.Error("wait and upload save state failed", "room_id", roomID, "error", err)
-		return nil, err
-	}
-
-	slog.Info("save state completed", "room_id", roomID, "size", size)
 	return &workerpb.SaveStateResponse{Size: size}, nil
 }
 
 // LoadState 读取游戏存档
-// 流程：下载状态二进制到共享目录 load.dat → control 广播 0x08（令 EmuRunner 反序列化）
+// 流程：下载状态二进制到 workDir → 通过管道命令 EmuRunner 反序列化 → 等待确认
 func (s *WorkerServer) LoadState(ctx context.Context, req *workerpb.LoadStateRequest) (*workerpb.LoadStateResponse, error) {
 	roomID := req.GetRoomId()
 	slog.Info("LoadState received", "room_id", roomID, "save_state_id", req.GetSaveStateId())
 
-	// 1. 下载存档二进制到共享目录 load.dat
-	if err := s.sessions.PrepareLoadState(ctx, roomID, req.GetDownloadUrl()); err != nil {
-		slog.Error("prepare load state failed", "room_id", roomID, "error", err)
+	if err := s.sessions.LoadStateViaPipe(ctx, roomID, req.GetDownloadUrl()); err != nil {
+		slog.Error("load state via pipe failed", "room_id", roomID, "error", err)
 		return nil, err
 	}
 
-	// 2. control DataChannel 广播 0x08，令 EmuRunner 反序列化恢复进度
-	if err := s.livekit.SendDataBroadcast(ctx, roomID, "control", true, []byte{0x08}); err != nil {
-		slog.Error("failed to broadcast load state command", "room_id", roomID, "error", err)
-		return nil, err
-	}
-
-	slog.Info("load state completed", "room_id", roomID)
+	slog.Info("load state completed via pipe", "room_id", roomID)
 	return &workerpb.LoadStateResponse{}, nil
 }

@@ -16,23 +16,17 @@ type LiveKitConfig struct {
 	RoomID  string
 }
 
-// DataChannel 协议 type prefix
+// DataChannel 协议 type prefix（保留输入和延迟探测，控制消息已迁移至 stdin 管道）
 const (
-	packetTypeInput   byte = 0x01 // 玩家手柄输入：[type][buttons_lo][buttons_hi][reserved]
-	packetTypePortMap byte = 0x02 // 端口映射更新：[type][count] + entries
-	packetTypePing    byte = 0x03 // 延迟探测请求：[type][client_ts:8B LE]
-	packetTypePong    byte = 0x04 // 延迟探测回复：[type][client_ts:8B LE][server_ts:8B LE]
-	packetTypePause   byte = 0x05 // 暂停模拟器运行
-	packetTypeResume  byte = 0x06 // 继续模拟器运行
-	packetTypeSave    byte = 0x07 // 保存存档：序列化到共享目录
-	packetTypeLoad    byte = 0x08 // 读取存档：从共享目录反序列化
+	packetTypeInput byte = 0x01 // 玩家手柄输入：[type][buttons_lo][buttons_hi][reserved]
+	packetTypePing  byte = 0x03 // 延迟探测请求：[type][client_ts:8B LE]
+	packetTypePong  byte = 0x04 // 延迟探测回复：[type][client_ts:8B LE][server_ts:8B LE]
 )
 
 // DataChannel topic 字符串
 const (
-	topicInput   = "input"   // 玩家输入
-	topicControl = "control" // 服务端控制消息（如 PORT_MAP）
-	topicPing    = "ping"    // 延迟探测
+	topicInput = "input" // 玩家输入
+	topicPing  = "ping"  // 延迟探测
 )
 
 type LiveKitPublisher struct {
@@ -45,10 +39,6 @@ type LiveKitPublisher struct {
 
 	OnMemberConnect    func(*lksdk.RemoteParticipant)
 	OnMemberDisconnect func(*lksdk.RemoteParticipant)
-	OnPause            func() // handleControlPacket 收到 type=0x05 时调用
-	OnResume           func() // handleControlPacket 收到 type=0x06 时调用
-	OnSaveState        func() // handleControlPacket 收到 type=0x07 时调用
-	OnLoadState        func() // handleControlPacket 收到 type=0x08 时调用
 }
 
 func NewLiveKitPublisher(config LiveKitConfig, inputMgr *InputManager) *LiveKitPublisher {
@@ -70,7 +60,7 @@ func (l *LiveKitPublisher) ConnectRoom() error {
 			l.OnMemberDisconnect(rp)
 		}
 	}
-	// DataChannel 包路由：按 topic 分发到 input/control 处理器
+	// DataChannel 包路由：按 topic 分发到 input/ping 处理器
 	cb.OnDataPacket = func(data lksdk.DataPacket, params lksdk.DataReceiveParams) {
 		userData, ok := data.(*lksdk.UserDataPacket)
 		if !ok {
@@ -83,12 +73,8 @@ func (l *LiveKitPublisher) ConnectRoom() error {
 		switch topic {
 		case topicInput:
 			l.handleInputPacket(params.SenderIdentity, userData.Payload)
-		case topicControl:
-			l.handleControlPacket(params.SenderIdentity, userData.Payload)
 		case topicPing:
 			l.handlePingPacket(params.SenderIdentity, userData.Payload)
-		default:
-			// 未知 topic 直接忽略
 		}
 	}
 	// 用token连接到livekit房间
@@ -141,78 +127,6 @@ func (l *LiveKitPublisher) handleInputPacket(senderIdentity string, payload []by
 	// 按 little-endian 解析 buttons
 	state := uint16(payload[1]) | (uint16(payload[2]) << 8)
 	l.inputMgr.UpdateInput(senderIdentity, state)
-}
-
-// handleControlPacket 解析服务端下发的控制包，按 type byte 分发
-// 该包由 Worker 通过 LiveKit Server SDK SendData 广播，sender 是服务端，无 identity
-// 支持的 type：
-//
-//	0x02 = PORT_MAP 端口映射更新
-//	0x05 = Pause 暂停模拟器
-//	0x06 = Resume 继续模拟器
-func (l *LiveKitPublisher) handleControlPacket(senderIdentity string, payload []byte) {
-	if len(payload) < 1 {
-		return
-	}
-	switch payload[0] {
-	case packetTypePortMap:
-		l.handlePortMapPacket(payload)
-	case packetTypePause:
-		slog.Info("pause command received via control channel")
-		if l.OnPause != nil {
-			l.OnPause()
-		}
-	case packetTypeResume:
-		slog.Info("resume command received via control channel")
-		if l.OnResume != nil {
-			l.OnResume()
-		}
-	case packetTypeSave:
-		slog.Info("save state command received via control channel")
-		if l.OnSaveState != nil {
-			l.OnSaveState()
-		}
-	case packetTypeLoad:
-		slog.Info("load state command received via control channel")
-		if l.OnLoadState != nil {
-			l.OnLoadState()
-		}
-	default:
-		slog.Warn("unknown control packet type", "type", payload[0])
-	}
-}
-
-// handlePortMapPacket 解析 PORT_MAP 控制包并更新 InputManager
-// 协议：[type=0x02][count] + count 个 [port][identity_len][identity_bytes]
-func (l *LiveKitPublisher) handlePortMapPacket(payload []byte) {
-	if l.inputMgr == nil {
-		return
-	}
-	if len(payload) < 2 {
-		return
-	}
-	count := int(payload[1])
-	entries := make([]PortEntry, 0, count)
-	offset := 2
-	for i := 0; i < count; i++ {
-		if offset+2 > len(payload) {
-			slog.Warn("port_map packet truncated", "offset", offset, "len", len(payload))
-			return
-		}
-		port := int(payload[offset])
-		offset++
-		idLen := int(payload[offset])
-		offset++
-		if offset+idLen > len(payload) {
-			slog.Warn("port_map identity truncated", "offset", offset, "id_len", idLen, "len", len(payload))
-			return
-		}
-		identity := string(payload[offset : offset+idLen])
-		offset += idLen
-		entries = append(entries, PortEntry{Port: port, Identity: identity})
-	}
-	l.inputMgr.UpdatePortMapping(entries)
-	slog.Info("port mapping updated", "entries", len(entries))
 }
 
 // handlePingPacket 处理玩家发出的延迟探测请求
