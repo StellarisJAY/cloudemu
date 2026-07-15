@@ -2,10 +2,15 @@
 import { ref } from 'vue'
 import type { ButtonName } from '@/utils/keyMapping'
 
-const props = defineProps<{
-  side: 'left' | 'right'
-  enabled: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    side: 'left' | 'right'
+    enabled: boolean
+    /** 按钮尺寸：normal=常规三段式布局，large=全屏悬浮模式（按钮放大约 1.5 倍） */
+    size?: 'normal' | 'large'
+  }>(),
+  { size: 'normal' },
+)
 
 const emit = defineEmits<{
   buttonChange: [btn: ButtonName, pressed: boolean]
@@ -135,7 +140,10 @@ function isActive(btn: ButtonName): boolean {
   <div
     ref="rootEl"
     class="virtual-gamepad"
-    :class="[`virtual-gamepad--${side}`, { 'is-disabled': !enabled }]"
+    :class="[
+      `virtual-gamepad--${side}`,
+      { 'is-disabled': !enabled, 'virtual-gamepad--large': size === 'large' },
+    ]"
     @touchstart="onTouchStart"
     @touchmove="onTouchMove"
     @touchend="onTouchEnd"
@@ -354,5 +362,49 @@ function isActive(btn: ButtonName): boolean {
 .action-btn-fn.is-pressed {
   background: rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── large 尺寸（全屏悬浮模式）：按钮放大约 1.5 倍，背景透明度略提高保证悬浮在画面上可见 ── */
+.virtual-gamepad--large .dpad-cell,
+.virtual-gamepad--large .dpad-btn,
+.virtual-gamepad--large .dpad-center {
+  width: 60px;
+  height: 60px;
+}
+
+.virtual-gamepad--large .dpad-btn {
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.virtual-gamepad--large .dpad-btn.is-pressed {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.virtual-gamepad--large .action-btn {
+  width: 78px;
+  height: 78px;
+  font-size: 28px;
+}
+
+.virtual-gamepad--large .action-btn--a {
+  background: rgba(220, 60, 60, 0.28);
+  margin-top: -12px;
+}
+
+.virtual-gamepad--large .action-btn--b {
+  background: rgba(60, 120, 220, 0.28);
+}
+
+.virtual-gamepad--large .action-btn-fn {
+  min-width: 52px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.5);
 }
 </style>

@@ -10,6 +10,7 @@ logs
 .codegraph
 .opencode
 .claude
+tasks
 
 # Editor directories and files
 .vscode/*

@@ -16,7 +16,7 @@ import VirtualGamepad from '@/components/play/VirtualGamepad.vue'
 import SaveStateDialog from '@/components/play/SaveStateDialog.vue'
 import type { Room, PlayerRole } from '@/types/api'
 import type { ButtonName } from '@/utils/keyMapping'
-import { useMediaQuery } from '@vueuse/core'
+import { useMediaQuery, useFullscreen } from '@vueuse/core'
 import '@/styles/mobile.css'
 
 const route = useRoute()
@@ -72,6 +72,29 @@ const gameInput = useGameInput(livekit.publishInput, inputEnabled)
 const isMobile = useMediaQuery('(pointer: coarse)')
 const showDrawerLeft = ref(false)
 const showDrawerRight = ref(false)
+
+// 全屏模式：优先用浏览器 Fullscreen API；不支持时（如 iOS Safari）降级为纯 CSS 隐藏顶栏
+const playViewEl = ref<HTMLElement>()
+const {
+  isFullscreen,
+  isSupported: fullscreenSupported,
+  enter: enterFullscreen,
+  exit: exitFullscreen,
+} = useFullscreen(playViewEl)
+const cssFullscreen = ref(false)
+const fullscreenActive = computed(() =>
+  fullscreenSupported.value ? isFullscreen.value : cssFullscreen.value,
+)
+
+/** 切换全屏模式（进入/退出） */
+async function toggleFullscreen() {
+  if (fullscreenSupported.value) {
+    if (isFullscreen.value) await exitFullscreen()
+    else await enterFullscreen()
+  } else {
+    cssFullscreen.value = !cssFullscreen.value
+  }
+}
 
 /** 虚拟手柄按键回调，将触摸事件桥接到 useGameInput */
 function handleGamepadButton(btn: ButtonName, pressed: boolean) {
@@ -367,7 +390,11 @@ function handleLeave() {
 </script>
 
 <template>
-  <div class="play-view" :class="{ 'is-mobile': isMobile }">
+  <div
+    ref="playViewEl"
+    class="play-view"
+    :class="{ 'is-mobile': isMobile, 'is-fullscreen': fullscreenActive }"
+  >
     <!-- 房间未找到 -->
     <div v-if="!room" class="play-not-found">
       <h2>房间不存在或已关闭</h2>
@@ -389,6 +416,14 @@ function handleLeave() {
           </n-tag>
         </div>
         <div class="header-right">
+          <button
+            v-if="isMobile"
+            class="mobile-drawer-trigger"
+            title="全屏"
+            @click="toggleFullscreen"
+          >
+            ⛶
+          </button>
           <button v-if="isMobile" class="mobile-drawer-trigger" title="成员列表" @click="showDrawerRight = true">
             👥
           </button>
@@ -446,10 +481,11 @@ function handleLeave() {
       <!-- 移动端：三段式 + 抽屉 + 竖屏提示 -->
       <template v-else>
         <div class="play-body-mobile">
-          <div class="gamepad-zone">
+          <div class="gamepad-zone gamepad-zone--left">
             <VirtualGamepad
               side="left"
               :enabled="inputEnabled"
+              :size="fullscreenActive ? 'large' : 'normal'"
               @button-change="handleGamepadButton"
             />
           </div>
@@ -461,13 +497,24 @@ function handleLeave() {
             :latency-ms="latencyMs"
             :is-mobile="true"
           />
-          <div class="gamepad-zone">
+          <div class="gamepad-zone gamepad-zone--right">
             <VirtualGamepad
               side="right"
               :enabled="inputEnabled"
+              :size="fullscreenActive ? 'large' : 'normal'"
               @button-change="handleGamepadButton"
             />
           </div>
+
+          <!-- 全屏浮动退出按钮 -->
+          <button
+            v-if="fullscreenActive"
+            class="fullscreen-exit-btn"
+            title="退出全屏"
+            @click="toggleFullscreen"
+          >
+            ✕
+          </button>
         </div>
 
         <n-drawer v-model:show="showDrawerLeft" placement="left" :width="260">
