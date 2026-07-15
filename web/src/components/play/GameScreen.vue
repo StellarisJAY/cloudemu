@@ -6,6 +6,7 @@ const props = defineProps<{
   emulatorType?: EmulatorType
   roomTitle?: string
   videoTrack?: MediaStreamTrack | null
+  audioTrack?: MediaStreamTrack | null
   latencyMs?: number | null
   isMobile?: boolean
 }>()
@@ -13,11 +14,14 @@ const props = defineProps<{
 const videoEl = ref<HTMLVideoElement>()
 
 watch(
-  () => props.videoTrack,
-  (track) => {
+  () => [props.videoTrack, props.audioTrack],
+  () => {
     if (!videoEl.value) return
-    if (track) {
-      videoEl.value.srcObject = new MediaStream([track])
+    const tracks: MediaStreamTrack[] = []
+    if (props.videoTrack) tracks.push(props.videoTrack)
+    if (props.audioTrack) tracks.push(props.audioTrack)
+    if (tracks.length > 0) {
+      videoEl.value.srcObject = new MediaStream(tracks)
     } else {
       videoEl.value.srcObject = null
     }
@@ -47,16 +51,15 @@ const emulatorCover: Record<EmulatorType, string> = {
     <div class="screen-video-area">
       <!-- 远端视频流 -->
       <video
-        v-show="videoTrack"
+        v-show="videoTrack || audioTrack"
         ref="videoEl"
         autoplay
-        muted
         playsinline
         class="screen-video"
       />
 
       <!-- 无流时的占位 -->
-      <div v-if="!videoTrack" class="screen-placeholder">
+      <div v-if="!videoTrack && !audioTrack" class="screen-placeholder">
         <img
           v-if="emulatorType"
           :src="emulatorCover[emulatorType]"

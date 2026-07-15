@@ -62,6 +62,7 @@ function formatSize(bytes: number): string {
 .rom-card {
   flex-shrink: 0;
   width: 200px;
+  min-height: 140px;
   cursor: pointer;
   border-radius: var(--radius-lg);
   overflow: hidden;

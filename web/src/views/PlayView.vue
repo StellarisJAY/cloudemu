@@ -57,6 +57,7 @@ const isHost = computed(
 const livekit = useLiveKit()
 const connectionState = computed(() => livekit.connectionState.value)
 const videoTrack = computed(() => livekit.videoTrack.value)
+const audioTrack = computed(() => livekit.audioTrack.value)
 
 // 模拟器状态
 const emulatorState = ref<'idle' | 'loading' | 'running' | 'paused' | 'error'>('idle')
@@ -398,6 +399,7 @@ function handleLeave() {
           :emulator-type="room.emulator_type"
           :room-title="room.title"
           :video-track="videoTrack"
+          :audio-track="audioTrack"
           :latency-ms="latencyMs"
         />
 
@@ -427,7 +429,9 @@ function handleLeave() {
             :emulator-type="room.emulator_type"
             :room-title="room.title"
             :video-track="videoTrack"
+            :audio-track="audioTrack"
             :latency-ms="latencyMs"
+            :is-mobile="true"
           />
           <div class="gamepad-zone">
             <VirtualGamepad

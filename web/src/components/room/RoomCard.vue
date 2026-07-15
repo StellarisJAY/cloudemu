@@ -102,6 +102,7 @@ const emulatorCover: Record<EmulatorType, string> = {
 .room-card {
   flex-shrink: 0;
   width: 230px;
+  min-height: 140px;
   cursor: pointer;
   border-radius: var(--radius-lg);
   overflow: hidden;

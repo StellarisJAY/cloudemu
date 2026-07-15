@@ -75,15 +75,21 @@ defineEmits<{
 }
 
 .card-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
-  overflow-x: auto;
+  overflow-y: auto;
+  align-content: start;
   padding: 4px 16px 12px;
   flex: 1;
 }
 
+.card-grid > :deep(.rom-card) {
+  width: 100%;
+}
+
 .card-grid::-webkit-scrollbar {
-  height: 4px;
+  width: 4px;
 }
 
 .card-grid::-webkit-scrollbar-thumb {
