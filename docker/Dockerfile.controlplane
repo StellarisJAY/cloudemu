@@ -1,0 +1,45 @@
+# Control Plane 多阶段构建
+# 第一阶段：编译
+FROM golang:1.26-alpine AS builder
+
+WORKDIR /build
+
+# 设置国内 Go 代理
+ENV GOPROXY=https://goproxy.cn,direct
+
+# 下载依赖（利用 Docker 层缓存，源码未变时跳过下载）
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 精确复制 Control Plane 所需的 Go 源码
+COPY cmd/control-plane/   ./cmd/control-plane/
+COPY internal/control-plane/ ./internal/control-plane/
+COPY internal/pkg/        ./internal/pkg/
+COPY internal/proto/      ./internal/proto/
+
+# 编译纯静态二进制，去调试信息以减小体积
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o control-plane ./cmd/control-plane/
+
+# 第二阶段：运行时
+FROM alpine:3.21
+
+# 安装 CA 证书（MinIO HTTPS）、时区数据（TimeZone 参数需要）、curl（健康检查）
+RUN apk add --no-cache ca-certificates tzdata curl
+
+WORKDIR /app
+
+# 复制编译产物
+COPY --from=builder /build/control-plane .
+
+# 复制验证码资源（运行时强依赖，缺失则启动失败）
+COPY assets/captcha/ ./assets/captcha/
+
+# 创建日志目录
+RUN mkdir -p /app/logs
+
+# 声明日志卷（供 docker-compose 挂载持久化）
+VOLUME /app/logs
+
+EXPOSE 8080
+
+ENTRYPOINT ["./control-plane"]

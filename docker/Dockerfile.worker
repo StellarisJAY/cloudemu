@@ -1,0 +1,68 @@
+# Worker Agent + EmuRunner 多阶段构建
+# Worker：管理 EmuRunner 子进程生命周期，暴露 gRPC 服务供 Control Plane 调用
+# EmuRunner：libretro 模拟器运行时，LiveKit 推流
+
+# ─── 第一阶段：编译 ───
+FROM golang:1.26 AS builder
+
+WORKDIR /build
+
+# 配置国内 apt 镜像源（加速构建）
+RUN sed -i 's/deb\.debian\.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+
+# 安装 x264 编码器开发包 + pkg-config（EmuRunner CGO 编译需要）
+# opus 编码器使用 pion/mediadevices 自带的静态预编译库（!dynamic build tag），无需安装 libopus-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libx264-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# 设置国内 Go 代理
+ENV GOPROXY=https://goproxy.cn,direct
+
+# 下载依赖（利用 Docker 层缓存）
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 精确复制 Worker + EmuRunner 所需的 Go 源码
+COPY cmd/worker/     ./cmd/worker/
+COPY cmd/emurunner/  ./cmd/emurunner/
+COPY internal/worker/     ./internal/worker/
+COPY internal/emurunner/  ./internal/emurunner/
+COPY internal/pkg/        ./internal/pkg/
+COPY internal/proto/      ./internal/proto/
+
+# 编译（CGO 必须启用：Worker import emurunner → 间接引入 CGO）
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o worker ./cmd/worker/
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o emurunner ./cmd/emurunner/
+
+# ─── 第二阶段：运行时 ───
+FROM ubuntu:24.04
+
+WORKDIR /app
+
+# 配置国内 apt 镜像源（加速构建）
+RUN sed -i 's/archive\.ubuntu\.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i 's/security\.ubuntu\.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/ubuntu.sources
+
+# 安装运行时依赖
+#   libx264-164     EmuRunner 的动态链接 x264 编码库（CGO 编译依赖）
+#   libstdc++6      libretro .so 依赖
+#   libgcc-s1       libretro .so 依赖
+#   ca-certificates LiveKit HTTPS 连接
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libx264-164 libstdc++6 libgcc-s1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制编译产物
+COPY --from=builder /build/worker /build/emurunner ./
+
+# 复制 libretro 模拟器内核
+# 运行时加载路径硬编码为 ./libretro/（见 internal/emurunner/backend/backend.go:540）
+COPY libretro/ ./libretro/
+
+# 验证 EmuRunner 的动态库依赖是否全部满足（仅打印，不阻塞构建）
+RUN ldd ./emurunner || true
+
+EXPOSE 9090
+
+ENTRYPOINT ["./worker"]

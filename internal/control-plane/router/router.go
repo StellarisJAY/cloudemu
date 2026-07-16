@@ -2,6 +2,7 @@ package router
 
 import (
 	"log/slog"
+	"net/http"
 
 	"github.com/StellarisJAY/cloudemu/internal/control-plane/contract"
 	"github.com/StellarisJAY/cloudemu/internal/control-plane/handler"
@@ -35,6 +36,11 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
 	}
 
 	r := gin.New()
+
+	// 健康检查端点（供 Docker / K8s 探活，无需认证）
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	// 使用 slog 自定义日志中间件替代 gin 默认 Logger
 	r.Use(logging.GinLogger(slog.Default()))
