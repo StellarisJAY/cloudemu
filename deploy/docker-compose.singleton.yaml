@@ -1,5 +1,6 @@
 version: "3.8"
 
+# 单例部署模式，仅启动一个worker和一个controlplane
 services:
   # ── PostgreSQL 16 ──
   postgres:
