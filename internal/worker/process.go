@@ -399,6 +399,31 @@ func (m *SessionManager) LoadStateViaPipe(ctx context.Context, roomID, downloadU
 	return nil
 }
 
+// SwitchRom 下载新 ROM 并通过管道命令 EmuRunner 热切换
+// 下载到 shared workDir/rom.dat（覆盖旧 ROM），发送 load_rom 命令，等待 EmuRunner 完成切换
+func (m *SessionManager) SwitchRom(roomID, romURL string) error {
+	session, ok := m.Get(roomID)
+	if !ok {
+		return fmt.Errorf("session not found: %s", roomID)
+	}
+
+	romPath := filepath.Join(session.WorkDir, "rom.dat")
+	if err := downloadFile(romPath, romURL); err != nil {
+		return fmt.Errorf("download new rom: %w", err)
+	}
+
+	resp, err := session.SendCommand(emurunner.Cmd{Cmd: "load_rom", RomPath: romPath})
+	if err != nil {
+		return fmt.Errorf("send load_rom command: %w", err)
+	}
+	if resp.Status != "ok" {
+		return fmt.Errorf("emurunner load_rom failed: %s", resp.Message)
+	}
+
+	slog.Info("switch rom via pipe completed", "room_id", roomID, "rom_path", romPath)
+	return nil
+}
+
 // workDirOf 返回房间的共享工作目录
 func (m *SessionManager) workDirOf(roomID string) (string, bool) {
 	m.mu.RLock()

@@ -8,6 +8,7 @@ import type {
   ChangeRoleReq,
   InviteToRoomReq,
   SelectRomReq,
+  SwitchRomReq,
   StartRoomResp,
   LivekitTokenResp,
   RoomMemberInfo,
@@ -42,14 +43,18 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
-  async function createRoom(req: CreateRoomReq): Promise<string | null> {
+  async function createRoom(req: CreateRoomReq): Promise<Room | string> {
     try {
       const res = await roomApi.create(req)
       if (res.data.code !== 0) {
         return res.data.message || '创建失败'
       }
+      const room = res.data.data
+      if (!room) {
+        return '服务器返回数据异常'
+      }
       await fetchRooms()
-      return null
+      return room
     } catch (e: unknown) {
       if (e && typeof e === 'object' && 'response' in e) {
         const err = e as { response?: { data?: { message?: string } } }
@@ -62,6 +67,22 @@ export const useRoomStore = defineStore('room', () => {
   async function selectRom(req: SelectRomReq): Promise<string | null> {
     try {
       const res = await roomApi.selectRom(req)
+      if (res.data.code !== 0) {
+        return res.data.message || '切换 ROM 失败'
+      }
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，切换 ROM 失败'
+      }
+      return '网络错误，切换 ROM 失败'
+    }
+  }
+
+  async function switchRom(req: SwitchRomReq): Promise<string | null> {
+    try {
+      const res = await roomApi.switchRom(req)
       if (res.data.code !== 0) {
         return res.data.message || '切换 ROM 失败'
       }
@@ -355,6 +376,7 @@ export const useRoomStore = defineStore('room', () => {
     fetchRooms,
     createRoom,
     selectRom,
+    switchRom,
     changeRole,
     inviteToRoom,
     startGame,

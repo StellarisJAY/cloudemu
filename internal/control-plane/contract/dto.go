@@ -114,6 +114,11 @@ type UpdateRomReq struct {
 	Title *string `form:"title" binding:"required"` // ROM 标题
 }
 
+// DeleteRomReq 删除 ROM 请求
+type DeleteRomReq struct {
+	RomID *uuid.UUID `json:"rom_id" binding:"required,notnil_uuid"` // 要删除的 ROM ID
+}
+
 // FriendAddReq 添加好友请求
 type FriendAddReq struct {
 	FriendID *uuid.UUID `json:"friend_id" binding:"required,notnil_uuid"` // 要添加的好友用户ID
@@ -132,6 +137,12 @@ type InviteToRoomReq struct {
 
 // SelectRomReq 选择/切换房间 ROM 请求
 type SelectRomReq struct {
+	RoomID *uuid.UUID `json:"room_id" binding:"required,notnil_uuid"` // 房间ID
+	RomID  *uuid.UUID `json:"rom_id"  binding:"required,notnil_uuid"` // 要切换的 ROM ID
+}
+
+// SwitchRomReq 游戏中热切换 ROM 请求（仅在 room.Status=1 playing 状态下可用）
+type SwitchRomReq struct {
 	RoomID *uuid.UUID `json:"room_id" binding:"required,notnil_uuid"` // 房间ID
 	RomID  *uuid.UUID `json:"rom_id"  binding:"required,notnil_uuid"` // 要切换的 ROM ID
 }

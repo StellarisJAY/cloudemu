@@ -14,6 +14,7 @@ type RoomService interface {
 	InviteToRoom(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID, inviteeIDs []uuid.UUID) error // 房主邀请好友加入已有房间，直接加入（无需接受）
 	ChangeRole(ctx context.Context, hostID uuid.UUID, req ChangeRoleReq) error                          // 房主调整成员角色：提升为玩家（分配/转移端口）或降级为旁观（port=0归还房主，其他释放）
 	SelectRom(ctx context.Context, hostID uuid.UUID, req SelectRomReq) error                            // 房主选择/切换房间的 ROM
+	SwitchRom(ctx context.Context, hostID uuid.UUID, req SwitchRomReq) error                            // 房主在游戏中热切换 ROM（only playing status）
 	Start(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) (*StartGameResponse, error)          // 房主启动游戏，调度Worker→gRPC调用→房间状态变为playing→返回LiveKit token
 	Pause(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) error                                // 房主暂停游戏，通知Worker→DataChannel→EmuRunner
 	Resume(ctx context.Context, hostID uuid.UUID, roomID uuid.UUID) error                               // 房主继续游戏，通知Worker→DataChannel→EmuRunner
@@ -39,6 +40,7 @@ type RoomRepo interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status int16) error       // 更新房间状态（同时设置started_at/closed_at）
 	SetWorkerAddr(ctx context.Context, id uuid.UUID, addr string) error       // 设置房间分配到的 Worker 地址
 	UpdateRomID(ctx context.Context, id uuid.UUID, romID *uuid.UUID) error    // 更新房间当前游玩的 ROM（romID 为 nil 时清空）
+	ActiveByRomID(ctx context.Context, romID uuid.UUID) ([]model.Room, error)  // 查询使用指定 ROM 的所有非关闭房间（status != 2）
 }
 
 // RoomPlayerRepo 房间座位表数据访问接口

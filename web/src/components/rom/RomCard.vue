@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Rom, EmulatorType } from '@/types/api'
 
-defineProps<{
+const props = defineProps<{
   rom: Rom
 }>()
 
-defineEmits<{
-  click: [romId: string]
+const emit = defineEmits<{
+  edit: [rom: Rom]
+  delete: [rom: Rom]
+  detail: [rom: Rom]
+  startGame: [rom: Rom]
 }>()
 
 const emulatorLabels: Record<EmulatorType, string> = {
@@ -31,31 +35,64 @@ function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
+
+const dropdownOptions = computed(() => {
+  if (props.rom.is_builtin) {
+    return [
+      { label: '详情', key: 'detail' },
+      { label: '开始游戏', key: 'start-game' },
+    ]
+  }
+  return [
+    { label: '编辑', key: 'edit' },
+    { label: '删除', key: 'delete' },
+    { label: '开始游戏', key: 'start-game' },
+  ]
+})
+
+function handleSelect(key: string) {
+  switch (key) {
+    case 'edit':
+      emit('edit', props.rom)
+      break
+    case 'delete':
+      emit('delete', props.rom)
+      break
+    case 'detail':
+      emit('detail', props.rom)
+      break
+    case 'start-game':
+      emit('startGame', props.rom)
+      break
+  }
+}
 </script>
 
 <template>
-  <div class="rom-card" @click="$emit('click', rom.id)">
-    <div class="card-cover" :class="`cover-${rom.emulator_type}`">
-      <img
-        v-if="rom.cover_path"
-        :src="coverUrl(rom.cover_path)"
-        :alt="rom.title"
-        class="cover-img"
-      />
-      <img
-        v-else
-        :src="emulatorCover[rom.emulator_type]"
-        :alt="rom.emulator_type"
-        class="cover-img"
-      />
-      <span class="card-emu-tag">{{ emulatorLabels[rom.emulator_type] }}</span>
-      <span v-if="rom.is_builtin" class="card-builtin-tag">平台内置</span>
+  <n-dropdown trigger="click" :options="dropdownOptions" @select="handleSelect">
+    <div class="rom-card">
+      <div class="card-cover" :class="`cover-${rom.emulator_type}`">
+        <img
+          v-if="rom.cover_path"
+          :src="coverUrl(rom.cover_path)"
+          :alt="rom.title"
+          class="cover-img"
+        />
+        <img
+          v-else
+          :src="emulatorCover[rom.emulator_type]"
+          :alt="rom.emulator_type"
+          class="cover-img"
+        />
+        <span class="card-emu-tag">{{ emulatorLabels[rom.emulator_type] }}</span>
+        <span v-if="rom.is_builtin" class="card-builtin-tag">平台内置</span>
+      </div>
+      <div class="card-info">
+        <span class="card-rom-title">{{ rom.title }}</span>
+        <span class="card-rom-size">{{ formatSize(rom.file_size) }}</span>
+      </div>
     </div>
-    <div class="card-info">
-      <span class="card-rom-title">{{ rom.title }}</span>
-      <span class="card-rom-size">{{ formatSize(rom.file_size) }}</span>
-    </div>
-  </div>
+  </n-dropdown>
 </template>
 
 <style scoped>

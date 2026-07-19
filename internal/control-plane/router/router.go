@@ -94,6 +94,7 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
 			auth.POST("/rooms/invite", h.Room.InviteToRoom)
 			auth.POST("/rooms/change-role", h.Room.ChangeRole)
 			auth.POST("/rooms/select-rom", h.Room.SelectRom)
+			auth.POST("/rooms/switch-rom", h.Room.SwitchRom)
 			auth.POST("/rooms/start", h.Room.Start)
 			auth.GET("/rooms/:id/members", h.Room.GetMembers)
 			auth.GET("/rooms/:id/livekit", h.Room.GetLivekitToken)
@@ -114,6 +115,7 @@ func New(cfg *config.Config, h *Handlers) *gin.Engine {
 			auth.GET("/roms", h.Rom.List)
 			auth.POST("/roms/upload", h.Rom.Upload)
 			auth.PUT("/roms/:id", h.Rom.Update)
+			auth.POST("/roms/delete", h.Rom.Delete)
 
 			// 管理员：平台内置 ROM 管理（JWTAuth + AdminAuth 查库校验）
 			admin := auth.Group("/admin", AdminAuth(h.UserRepo))

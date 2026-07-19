@@ -15,6 +15,9 @@ type RomService interface {
 	List(ctx context.Context, userID uuid.UUID) ([]model.Rom, error)                                                                                // 列出当前用户可用ROM（自有ROM + 全部平台内置ROM）
 	Update(ctx context.Context, userID uuid.UUID, romID uuid.UUID, req UpdateRomReq, coverFile io.Reader, coverFileName string) (*model.Rom, error) // 更新自有ROM标题和封面（内置ROM不可改）
 
+	// 用户删除自有 ROM（软删除：MinIO 文件 + DB 记录）
+	Delete(ctx context.Context, userID uuid.UUID, romID uuid.UUID) error // 删除自有 ROM：校验归属（非本人/内置不可删）→ 检查无活跃房间使用 → 删 MinIO 文件 → 删 DB
+
 	// ---- 管理员：平台内置 ROM 管理 ----
 	UploadBuiltin(ctx context.Context, adminID uuid.UUID, req UploadRomReq, romFile io.Reader, romFileName string, romFileSize int64) (*model.Rom, error) // 管理员上传平台内置ROM（is_builtin=true，全体用户可见）
 	ListBuiltin(ctx context.Context) ([]model.Rom, error)                                                                                                 // 列出全部平台内置ROM（管理后台用）

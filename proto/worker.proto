@@ -48,6 +48,10 @@ service WorkerAgent {
   // 房主调用：Worker 用预签名 URL 下载状态二进制到共享目录，通过 control DataChannel (type=0x08)
   // 令 EmuRunner 反序列化恢复游戏进度
   rpc LoadState(LoadStateRequest) returns (LoadStateResponse);
+
+  // SwitchRom 热切换 ROM 文件（游戏运行中切换）
+  // 房主调用：Worker 下载新 ROM → 通过 stdin pipe 发送 load_rom 命令 → EmuRunner 卸载旧 ROM 并加载新 ROM
+  rpc SwitchRom(SwitchRomRequest) returns (SwitchRomResponse);
 }
 
 // StartGameRequest 启动游戏会话请求
@@ -147,3 +151,14 @@ message LoadStateRequest {
 
 // LoadStateResponse 读取存档响应（空消息）
 message LoadStateResponse {}
+
+// SwitchRomRequest 热切换 ROM 请求
+message SwitchRomRequest {
+  string room_id = 1;        // 房间 ID
+  string rom_url = 2;        // MinIO 预签名 ROM 下载 URL
+  string rom_id = 3;         // 新 ROM ID（UUIDv7 字符串，用于日志）
+  string emulator_type = 4;  // 模拟器类型（与房间类型一致）
+}
+
+// SwitchRomResponse 热切换 ROM 响应（空消息）
+message SwitchRomResponse {}

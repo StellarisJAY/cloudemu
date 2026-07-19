@@ -214,6 +214,54 @@ func (s *RoomService) SelectRom(ctx context.Context, hostID uuid.UUID, req contr
 	return s.roomRepo.UpdateRomID(ctx, *req.RoomID, req.RomID)
 }
 
+// SwitchRom 房主在游戏中热切换 ROM（仅 room.Status=1 playing 状态下可用）
+func (s *RoomService) SwitchRom(ctx context.Context, hostID uuid.UUID, req contract.SwitchRomReq) error {
+	room, err := s.roomRepo.ByID(ctx, *req.RoomID)
+	if err != nil || room == nil {
+		return apperror.ErrRoomNotExist
+	}
+	if room.HostID != hostID {
+		return apperror.ErrNotRoomHost
+	}
+	if room.Status != 1 {
+		return apperror.ErrRoomNotPlaying
+	}
+
+	rom, err := s.romRepo.ByID(ctx, *req.RomID)
+	if err != nil || rom == nil {
+		return apperror.ErrRomNotExist
+	}
+	if rom.EmulatorType != room.EmulatorType {
+		return apperror.ErrRomTypeMismatch
+	}
+
+	if room.WorkerAddr == "" {
+		return apperror.ErrWorkerUnavailable
+	}
+
+	// 生成 MinIO 预签名 ROM 下载 URL（5 分钟有效期）
+	romURL, err := s.minioFunc.PresignedGetURL(ctx, s.bucket, rom.MinioPath, 5*time.Minute)
+	if err != nil {
+		slog.Error("failed to generate presigned rom url for SwitchRom", "room_id", *req.RoomID, "error", err)
+		return apperror.ErrInternal
+	}
+
+	// gRPC 调用 Worker 热切换 ROM
+	if err := s.workerClient.SwitchRom(ctx, room.WorkerAddr, *req.RoomID, *req.RomID, romURL, room.EmulatorType); err != nil {
+		slog.Error("worker SwitchRom gRPC failed", "worker", room.WorkerAddr, "room_id", *req.RoomID, "error", err)
+		return apperror.ErrWorkerUnavailable
+	}
+
+	// 更新房间当前 ROM
+	if err := s.roomRepo.UpdateRomID(ctx, *req.RoomID, req.RomID); err != nil {
+		slog.Warn("failed to update room rom_id after SwitchRom", "room_id", *req.RoomID, "error", err)
+		return apperror.ErrInternal
+	}
+
+	slog.Info("rom switched in game", "room_id", *req.RoomID, "rom_id", *req.RomID)
+	return nil
+}
+
 // ChangeRole 房主调整成员角色
 // role=1(提升为玩家)：必须传入 port，若端口已被占用则原占有者让出（房主仅清端口保持 role=0，其他玩家降为旁观）→ 目标设为 role=1 并绑定端口 → 更新 Redis → 通知 Worker
 // role=2(降为旁观)：后端查询目标已有端口并释放 → 若 port=0 则归还房主 → 通知 Worker

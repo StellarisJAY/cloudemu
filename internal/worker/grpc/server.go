@@ -236,3 +236,19 @@ func (s *WorkerServer) LoadState(ctx context.Context, req *workerpb.LoadStateReq
 	slog.Info("load state completed via pipe", "room_id", roomID)
 	return &workerpb.LoadStateResponse{}, nil
 }
+
+// SwitchRom 热切换 ROM 文件
+// 控制面请求 Worker 下载新 ROM 并通知 EmuRunner 热切换
+func (s *WorkerServer) SwitchRom(ctx context.Context, req *workerpb.SwitchRomRequest) (*workerpb.SwitchRomResponse, error) {
+	roomID := req.GetRoomId()
+	romURL := req.GetRomUrl()
+	slog.Info("SwitchRom received", "room_id", roomID, "rom_id", req.GetRomId(), "emulator_type", req.GetEmulatorType())
+
+	if err := s.sessions.SwitchRom(roomID, romURL); err != nil {
+		slog.Error("switch rom failed", "room_id", roomID, "error", err)
+		return nil, err
+	}
+
+	slog.Info("switch rom completed", "room_id", roomID)
+	return &workerpb.SwitchRomResponse{}, nil
+}

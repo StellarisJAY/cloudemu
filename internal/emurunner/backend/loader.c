@@ -33,6 +33,7 @@ typedef struct {
     void* (*retro_get_memory_data)(unsigned);
     size_t (*retro_get_memory_size)(unsigned);
     void (*retro_set_controller_port_device)(unsigned, unsigned);
+    void (*retro_unload_game)(void);
 } core_t;
 
 // 全局单例 — 单进程仅运行一个 libretro 内核实例
@@ -106,6 +107,7 @@ void* core_load(const char* path) {
     c->retro_get_memory_data = dlsym(h, "retro_get_memory_data");
     c->retro_get_memory_size = dlsym(h, "retro_get_memory_size");
     c->retro_set_controller_port_device = dlsym(h, "retro_set_controller_port_device");
+    c->retro_unload_game = dlsym(h, "retro_unload_game");
 
     return c;
 }
@@ -192,6 +194,12 @@ bool core_load_game_data(void* core, const char* rom_path, void* data, size_t si
     info.size = size;
     printf("loading game data, path: %s, size: %ld\n", rom_path, size);
     return c->retro_load_game(&info);
+}
+
+// core_unload_game 卸载当前游戏（调用 core 的 retro_unload_game），用于热切换 ROM
+void core_unload_game(void* core) {
+    core_t* c = (core_t*)core;
+    if (c->retro_unload_game) c->retro_unload_game();
 }
 
 void core_get_system_info(void* core, struct retro_system_info* info)

@@ -7,8 +7,9 @@ package emurunner
 // Cmd Worker 发送给 EmuRunner 的命令
 // 通过子进程 stdin 传输，JSON 行协议
 type Cmd struct {
-	Cmd     string         `json:"cmd"`              // 命令名: pause / resume / port_map / save_state / load_state
+	Cmd     string         `json:"cmd"`              // 命令名: pause / resume / port_map / save_state / load_state / load_rom
 	Mapping map[int]string `json:"mapping,omitempty"` // port_map 时的端口映射: port → LiveKit identity
+	RomPath string         `json:"rom_path,omitempty"` // load_rom 时的新 ROM 文件路径
 }
 
 // Resp EmuRunner 回复给 Worker 的响应

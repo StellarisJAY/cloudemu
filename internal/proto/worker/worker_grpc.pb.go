@@ -32,6 +32,7 @@ const (
 	WorkerAgent_ResumeGame_FullMethodName          = "/cloudemu.worker.WorkerAgent/ResumeGame"
 	WorkerAgent_SaveState_FullMethodName           = "/cloudemu.worker.WorkerAgent/SaveState"
 	WorkerAgent_LoadState_FullMethodName           = "/cloudemu.worker.WorkerAgent/LoadState"
+	WorkerAgent_SwitchRom_FullMethodName           = "/cloudemu.worker.WorkerAgent/SwitchRom"
 )
 
 // WorkerAgentClient is the client API for WorkerAgent service.
@@ -70,6 +71,9 @@ type WorkerAgentClient interface {
 	// 房主调用：Worker 用预签名 URL 下载状态二进制到共享目录，通过 control DataChannel (type=0x08)
 	// 令 EmuRunner 反序列化恢复游戏进度
 	LoadState(ctx context.Context, in *LoadStateRequest, opts ...grpc.CallOption) (*LoadStateResponse, error)
+	// SwitchRom 热切换 ROM 文件（游戏运行中切换）
+	// 房主调用：Worker 下载新 ROM → 通过 stdin pipe 发送 load_rom 命令 → EmuRunner 卸载旧 ROM 并加载新 ROM
+	SwitchRom(ctx context.Context, in *SwitchRomRequest, opts ...grpc.CallOption) (*SwitchRomResponse, error)
 }
 
 type workerAgentClient struct {
@@ -170,6 +174,16 @@ func (c *workerAgentClient) LoadState(ctx context.Context, in *LoadStateRequest,
 	return out, nil
 }
 
+func (c *workerAgentClient) SwitchRom(ctx context.Context, in *SwitchRomRequest, opts ...grpc.CallOption) (*SwitchRomResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SwitchRomResponse)
+	err := c.cc.Invoke(ctx, WorkerAgent_SwitchRom_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkerAgentServer is the server API for WorkerAgent service.
 // All implementations must embed UnimplementedWorkerAgentServer
 // for forward compatibility.
@@ -206,6 +220,9 @@ type WorkerAgentServer interface {
 	// 房主调用：Worker 用预签名 URL 下载状态二进制到共享目录，通过 control DataChannel (type=0x08)
 	// 令 EmuRunner 反序列化恢复游戏进度
 	LoadState(context.Context, *LoadStateRequest) (*LoadStateResponse, error)
+	// SwitchRom 热切换 ROM 文件（游戏运行中切换）
+	// 房主调用：Worker 下载新 ROM → 通过 stdin pipe 发送 load_rom 命令 → EmuRunner 卸载旧 ROM 并加载新 ROM
+	SwitchRom(context.Context, *SwitchRomRequest) (*SwitchRomResponse, error)
 	mustEmbedUnimplementedWorkerAgentServer()
 }
 
@@ -242,6 +259,9 @@ func (UnimplementedWorkerAgentServer) SaveState(context.Context, *SaveStateReque
 }
 func (UnimplementedWorkerAgentServer) LoadState(context.Context, *LoadStateRequest) (*LoadStateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadState not implemented")
+}
+func (UnimplementedWorkerAgentServer) SwitchRom(context.Context, *SwitchRomRequest) (*SwitchRomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SwitchRom not implemented")
 }
 func (UnimplementedWorkerAgentServer) mustEmbedUnimplementedWorkerAgentServer() {}
 func (UnimplementedWorkerAgentServer) testEmbeddedByValue()                     {}
@@ -426,6 +446,24 @@ func _WorkerAgent_LoadState_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkerAgent_SwitchRom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwitchRomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkerAgentServer).SwitchRom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkerAgent_SwitchRom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkerAgentServer).SwitchRom(ctx, req.(*SwitchRomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkerAgent_ServiceDesc is the grpc.ServiceDesc for WorkerAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -468,6 +506,10 @@ var WorkerAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LoadState",
 			Handler:    _WorkerAgent_LoadState_Handler,
+		},
+		{
+			MethodName: "SwitchRom",
+			Handler:    _WorkerAgent_SwitchRom_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

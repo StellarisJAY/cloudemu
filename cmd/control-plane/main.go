@@ -169,7 +169,7 @@ func main() {
 		minioAdapter, cfg.MinioBucket,
 		saveStateRepo,
 	)
-	romSvc := service.NewRomService(romRepo, minioAdapter, cfg.MinioBucket)
+	romSvc := service.NewRomService(romRepo, roomRepo, minioAdapter, cfg.MinioBucket)
 	friendSvc := service.NewFriendService(friendRepo, userRepo)
 
 	// ---- 依赖注入：Handler 层 ----

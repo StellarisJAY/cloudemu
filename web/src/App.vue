@@ -14,7 +14,9 @@ const { isDark, toggle } = useTheme()
     <n-loading-bar-provider>
       <n-notification-provider>
         <n-message-provider>
-          <router-view />
+          <n-dialog-provider>
+            <router-view />
+          </n-dialog-provider>
 
           <!-- 主题切换浮动按钮 -->
           <button

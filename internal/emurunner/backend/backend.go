@@ -216,6 +216,16 @@ func (lb *LibretroBackend) Unserialize(data []byte) error {
 	return nil
 }
 
+// UnloadGame 卸载当前加载的游戏 ROM，调用 libretro core 的 retro_unload_game
+// 用于热切换 ROM，在加载新游戏前调用，避免两个游戏状态冲突
+func (lb *LibretroBackend) UnloadGame() {
+	if lb.ptr == nil {
+		return
+	}
+	C.core_unload_game(lb.ptr)
+	lb.romData = nil
+}
+
 // LoadGameFile 加载rom文件
 func (lb *LibretroBackend) LoadGameFile(path string) bool {
 	cpath := C.CString(path)

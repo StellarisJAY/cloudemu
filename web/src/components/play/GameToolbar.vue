@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useMessage } from 'naive-ui'
+import { useDialog, useMessage } from 'naive-ui'
 import KeyMappingDialog from './KeyMappingDialog.vue'
 import type { Rom } from '@/types/api'
 
@@ -21,8 +21,9 @@ const props = defineProps<{
   buttonLoading?: string | null
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   selectRom: [romId: string]
+  switchRom: [romId: string]
   startGame: []
   pause: []
   resume: []
@@ -37,8 +38,43 @@ defineEmits<{
 const currentRom = computed(() => props.roms.find((r) => r.id === props.currentRomId))
 
 const message = useMessage()
+const dialog = useDialog()
 
 const showKeyMapping = ref(false)
+
+/** 是否存在 ROM 切换中（playing 状态下拦截 ROM 选择，待用户确认） */
+const pendingRomId = ref<string | null>(null)
+
+/** 是否正在游戏中（roomStatus=1 且模拟器已启动） */
+const isPlaying = computed(() => props.roomStatus === 1 && (props.emulatorState === 'running' || props.emulatorState === 'paused'))
+
+/** 处理 ROM 选择：waiting 状态直接切换，playing 状态弹窗确认 */
+function handleRomSelect(romId: string) {
+  if (romId === props.currentRomId) return
+  if (isPlaying.value) {
+    pendingRomId.value = romId
+    dialog.warning({
+      title: '确认切换 ROM',
+      content: '切换 ROM 将丢失当前游戏进度，确定继续？',
+      positiveText: '确定切换',
+      negativeText: '取消',
+      onPositiveClick: () => {
+        if (pendingRomId.value) {
+          emit('switchRom', pendingRomId.value)
+        }
+        pendingRomId.value = null
+      },
+      onNegativeClick: () => {
+        pendingRomId.value = null
+      },
+      onClose: () => {
+        pendingRomId.value = null
+      },
+    })
+  } else {
+    emit('selectRom', romId)
+  }
+}
 
 /** 是否有控制操作正在执行中，所有控制按钮在此时禁用 */
 const isBusy = computed(() => props.buttonLoading != null && props.buttonLoading !== '')
@@ -89,7 +125,7 @@ const connectionBtnType: Record<ConnectionState, string> = {
           placeholder="选择 ROM 文件"
           filterable
           class="rom-select"
-          @update:value="(id: string) => $emit('selectRom', id)"
+          @update:value="handleRomSelect"
         />
         <div v-if="currentRom" class="current-rom">
           <span class="current-rom-label">{{ currentRom.title }}</span>

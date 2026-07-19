@@ -127,3 +127,22 @@ func (h *RomHandler) Update(c *gin.Context) {
 
 	response.OK(c, rom)
 }
+
+// Delete POST /api/roms/delete — 删除自有 ROM（需登录）
+// 删除前校验 ROM 归属且无活跃房间使用，同步删除 MinIO 文件与封面
+func (h *RomHandler) Delete(c *gin.Context) {
+	var req contract.DeleteRomReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.svc.Delete(c.Request.Context(), userID, *req.RomID); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.OK(c, nil)
+}

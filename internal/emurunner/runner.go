@@ -57,6 +57,13 @@ func (r *Runner) LoadROM(path string) error {
 	return nil
 }
 
+// UnloadROM 卸载当前加载的游戏 ROM，调用 retro_unload_game 清理 core 内部状态
+// 用于热切换 ROM，调用后 Runner 处于已初始化但无游戏加载的状态
+func (r *Runner) UnloadROM() {
+	r.backend.UnloadGame()
+	slog.Info("rom unloaded")
+}
+
 func (r *Runner) Run(ctx context.Context) {
 	fps := r.backend.AVInfo.FPS
 	interval := time.Duration(1000000000 / fps)

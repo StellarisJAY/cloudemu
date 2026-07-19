@@ -104,6 +104,24 @@ func (h *RoomHandler) SelectRom(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// SwitchRom POST /api/rooms/switch-rom — 房主在游戏中热切换 ROM（需登录，仅 playing 状态）
+func (h *RoomHandler) SwitchRom(c *gin.Context) {
+	var req contract.SwitchRomReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	hostID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.svc.SwitchRom(c.Request.Context(), hostID, req); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.OK(c, nil)
+}
+
 // Start POST /api/rooms/start — 房主启动游戏（需登录）
 func (h *RoomHandler) Start(c *gin.Context) {
 	var req contract.StartRoomReq

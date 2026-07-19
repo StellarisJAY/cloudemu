@@ -176,6 +176,11 @@ export interface SelectRomReq {
   rom_id: string
 }
 
+export interface SwitchRomReq {
+  room_id: string
+  rom_id: string
+}
+
 export interface StartRoomResp {
   livekit_token: string
   livekit_room: string

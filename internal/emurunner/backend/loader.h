@@ -16,6 +16,7 @@ void        core_init(void* handle);
 void        core_deinit(void* handle);
 bool        core_load_game_file(void* handle, const char* rom_path);
 bool        core_load_game_data(void* core, const char* rom_path, void* data, size_t size);
+void        core_unload_game(void* handle);
 void        core_run(void* handle);
 void        core_reset(void* handle);
 

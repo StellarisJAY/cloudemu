@@ -23,7 +23,10 @@ defineEmits<{
   'room-stop': [roomId: string]
   'room-leave': [roomId: string]
   upload: []
-  'rom-click': [romId: string]
+  'edit-rom': [rom: Rom]
+  'delete-rom': [rom: Rom]
+  'detail-rom': [rom: Rom]
+  'start-with-rom': [rom: Rom]
 }>()
 
 type Tab = 'rooms' | 'roms' | 'friends'
@@ -71,7 +74,10 @@ const activeTab = ref<Tab>('rooms')
           :loading="romLoading"
           class="mobile-list"
           @upload="$emit('upload')"
-          @rom-click="(id: string) => $emit('rom-click', id)"
+          @edit-rom="(rom: Rom) => $emit('edit-rom', rom)"
+          @delete-rom="(rom: Rom) => $emit('delete-rom', rom)"
+          @detail-rom="(rom: Rom) => $emit('detail-rom', rom)"
+          @start-with-rom="(rom: Rom) => $emit('start-with-rom', rom)"
         />
       </section>
 

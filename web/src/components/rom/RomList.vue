@@ -9,7 +9,10 @@ defineProps<{
 
 defineEmits<{
   upload: []
-  'rom-click': [romId: string]
+  'edit-rom': [rom: Rom]
+  'delete-rom': [rom: Rom]
+  'detail-rom': [rom: Rom]
+  'start-with-rom': [rom: Rom]
 }>()
 </script>
 
@@ -28,7 +31,15 @@ defineEmits<{
     </div>
 
     <div v-else class="card-grid">
-      <RomCard v-for="rom in roms" :key="rom.id" :rom="rom" @click="$emit('rom-click', rom.id)" />
+      <RomCard
+        v-for="rom in roms"
+        :key="rom.id"
+        :rom="rom"
+        @edit="$emit('edit-rom', $event)"
+        @delete="$emit('delete-rom', $event)"
+        @detail="$emit('detail-rom', $event)"
+        @startGame="$emit('start-with-rom', $event)"
+      />
     </div>
   </div>
 </template>

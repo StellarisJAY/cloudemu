@@ -7,6 +7,7 @@ import type {
   InviteToRoomReq,
   StartRoomReq,
   SelectRomReq,
+  SwitchRomReq,
   StartRoomResp,
   LivekitTokenResp,
   RoomMemberInfo,
@@ -48,6 +49,11 @@ export const roomApi = {
   /** POST /api/rooms/select-rom — 房主选择/切换房间的 ROM */
   selectRom(data: SelectRomReq) {
     return client.post<ApiResponse<null>>('/rooms/select-rom', data)
+  },
+
+  /** POST /api/rooms/switch-rom — 房主在游戏中热切换 ROM */
+  switchRom(data: SwitchRomReq) {
+    return client.post<ApiResponse<null>>('/rooms/switch-rom', data)
   },
 
   /** POST /api/rooms/start — 房主启动游戏 */

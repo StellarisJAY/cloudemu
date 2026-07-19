@@ -23,4 +23,9 @@ export const romApi = {
       timeout: 60000,
     })
   },
+
+  /** POST /api/roms/delete — 删除自有 ROM */
+  deleteRom(romId: string) {
+    return client.post<ApiResponse<null>>('/roms/delete', { rom_id: romId })
+  },
 }

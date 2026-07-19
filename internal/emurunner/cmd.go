@@ -60,6 +60,21 @@ func (instance *Instance) HandleCommand(raw []byte) {
 		slog.Info("load state via pipe completed")
 		writeResp(Resp{Cmd: "load_state", Status: "ok"})
 
+	case "load_rom":
+		romPath := cmd.RomPath
+		if romPath == "" {
+			writeResp(Resp{Cmd: "load_rom", Status: "error", Message: "missing rom_path"})
+			return
+		}
+		slog.Info("reloading rom via pipe", "path", romPath)
+		if err := instance.ReloadROM(romPath); err != nil {
+			slog.Error("reload rom via pipe failed", "error", err)
+			writeResp(Resp{Cmd: "load_rom", Status: "error", Message: err.Error()})
+			return
+		}
+		slog.Info("reload rom via pipe completed", "path", romPath)
+		writeResp(Resp{Cmd: "load_rom", Status: "ok"})
+
 	default:
 		slog.Warn("unknown pipe command", "cmd", cmd.Cmd)
 		writeResp(Resp{Cmd: cmd.Cmd, Status: "error", Message: "unknown command: " + cmd.Cmd})

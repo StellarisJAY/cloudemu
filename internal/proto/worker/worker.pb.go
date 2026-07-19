@@ -925,6 +925,112 @@ func (*LoadStateResponse) Descriptor() ([]byte, []int) {
 	return file_proto_worker_proto_rawDescGZIP(), []int{17}
 }
 
+// SwitchRomRequest 热切换 ROM 请求
+type SwitchRomRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`                   // 房间 ID
+	RomUrl        string                 `protobuf:"bytes,2,opt,name=rom_url,json=romUrl,proto3" json:"rom_url,omitempty"`                   // MinIO 预签名 ROM 下载 URL
+	RomId         string                 `protobuf:"bytes,3,opt,name=rom_id,json=romId,proto3" json:"rom_id,omitempty"`                      // 新 ROM ID（UUIDv7 字符串，用于日志）
+	EmulatorType  string                 `protobuf:"bytes,4,opt,name=emulator_type,json=emulatorType,proto3" json:"emulator_type,omitempty"` // 模拟器类型（与房间类型一致）
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwitchRomRequest) Reset() {
+	*x = SwitchRomRequest{}
+	mi := &file_proto_worker_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwitchRomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwitchRomRequest) ProtoMessage() {}
+
+func (x *SwitchRomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_worker_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwitchRomRequest.ProtoReflect.Descriptor instead.
+func (*SwitchRomRequest) Descriptor() ([]byte, []int) {
+	return file_proto_worker_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SwitchRomRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *SwitchRomRequest) GetRomUrl() string {
+	if x != nil {
+		return x.RomUrl
+	}
+	return ""
+}
+
+func (x *SwitchRomRequest) GetRomId() string {
+	if x != nil {
+		return x.RomId
+	}
+	return ""
+}
+
+func (x *SwitchRomRequest) GetEmulatorType() string {
+	if x != nil {
+		return x.EmulatorType
+	}
+	return ""
+}
+
+// SwitchRomResponse 热切换 ROM 响应（空消息）
+type SwitchRomResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwitchRomResponse) Reset() {
+	*x = SwitchRomResponse{}
+	mi := &file_proto_worker_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwitchRomResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwitchRomResponse) ProtoMessage() {}
+
+func (x *SwitchRomResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_worker_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwitchRomResponse.ProtoReflect.Descriptor instead.
+func (*SwitchRomResponse) Descriptor() ([]byte, []int) {
+	return file_proto_worker_proto_rawDescGZIP(), []int{19}
+}
+
 var File_proto_worker_proto protoreflect.FileDescriptor
 
 const file_proto_worker_proto_rawDesc = "" +
@@ -983,7 +1089,13 @@ const file_proto_worker_proto_rawDesc = "" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\"\n" +
 	"\rsave_state_id\x18\x02 \x01(\tR\vsaveStateId\x12!\n" +
 	"\fdownload_url\x18\x03 \x01(\tR\vdownloadUrl\"\x13\n" +
-	"\x11LoadStateResponse2\xc3\x06\n" +
+	"\x11LoadStateResponse\"\x80\x01\n" +
+	"\x10SwitchRomRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x17\n" +
+	"\arom_url\x18\x02 \x01(\tR\x06romUrl\x12\x15\n" +
+	"\x06rom_id\x18\x03 \x01(\tR\x05romId\x12#\n" +
+	"\remulator_type\x18\x04 \x01(\tR\femulatorType\"\x13\n" +
+	"\x11SwitchRomResponse2\x97\a\n" +
 	"\vWorkerAgent\x12R\n" +
 	"\tStartGame\x12!.cloudemu.worker.StartGameRequest\x1a\".cloudemu.worker.StartGameResponse\x12O\n" +
 	"\bStopGame\x12 .cloudemu.worker.StopGameRequest\x1a!.cloudemu.worker.StopGameResponse\x12^\n" +
@@ -994,7 +1106,8 @@ const file_proto_worker_proto_rawDesc = "" +
 	"\n" +
 	"ResumeGame\x12\".cloudemu.worker.ResumeGameRequest\x1a#.cloudemu.worker.ResumeGameResponse\x12R\n" +
 	"\tSaveState\x12!.cloudemu.worker.SaveStateRequest\x1a\".cloudemu.worker.SaveStateResponse\x12R\n" +
-	"\tLoadState\x12!.cloudemu.worker.LoadStateRequest\x1a\".cloudemu.worker.LoadStateResponseBAZ?github.com/StellarisJAY/cloudemu/internal/proto/worker;workerpbb\x06proto3"
+	"\tLoadState\x12!.cloudemu.worker.LoadStateRequest\x1a\".cloudemu.worker.LoadStateResponse\x12R\n" +
+	"\tSwitchRom\x12!.cloudemu.worker.SwitchRomRequest\x1a\".cloudemu.worker.SwitchRomResponseBAZ?github.com/StellarisJAY/cloudemu/internal/proto/worker;workerpbb\x06proto3"
 
 var (
 	file_proto_worker_proto_rawDescOnce sync.Once
@@ -1008,7 +1121,7 @@ func file_proto_worker_proto_rawDescGZIP() []byte {
 	return file_proto_worker_proto_rawDescData
 }
 
-var file_proto_worker_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_proto_worker_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_proto_worker_proto_goTypes = []any{
 	(*StartGameRequest)(nil),            // 0: cloudemu.worker.StartGameRequest
 	(*StartGameResponse)(nil),           // 1: cloudemu.worker.StartGameResponse
@@ -1028,10 +1141,12 @@ var file_proto_worker_proto_goTypes = []any{
 	(*SaveStateResponse)(nil),           // 15: cloudemu.worker.SaveStateResponse
 	(*LoadStateRequest)(nil),            // 16: cloudemu.worker.LoadStateRequest
 	(*LoadStateResponse)(nil),           // 17: cloudemu.worker.LoadStateResponse
-	nil,                                 // 18: cloudemu.worker.UpdatePortMappingRequest.MappingEntry
+	(*SwitchRomRequest)(nil),            // 18: cloudemu.worker.SwitchRomRequest
+	(*SwitchRomResponse)(nil),           // 19: cloudemu.worker.SwitchRomResponse
+	nil,                                 // 20: cloudemu.worker.UpdatePortMappingRequest.MappingEntry
 }
 var file_proto_worker_proto_depIdxs = []int32{
-	18, // 0: cloudemu.worker.UpdatePortMappingRequest.mapping:type_name -> cloudemu.worker.UpdatePortMappingRequest.MappingEntry
+	20, // 0: cloudemu.worker.UpdatePortMappingRequest.mapping:type_name -> cloudemu.worker.UpdatePortMappingRequest.MappingEntry
 	0,  // 1: cloudemu.worker.WorkerAgent.StartGame:input_type -> cloudemu.worker.StartGameRequest
 	2,  // 2: cloudemu.worker.WorkerAgent.StopGame:input_type -> cloudemu.worker.StopGameRequest
 	4,  // 3: cloudemu.worker.WorkerAgent.SessionStatus:input_type -> cloudemu.worker.SessionStatusRequest
@@ -1041,17 +1156,19 @@ var file_proto_worker_proto_depIdxs = []int32{
 	12, // 7: cloudemu.worker.WorkerAgent.ResumeGame:input_type -> cloudemu.worker.ResumeGameRequest
 	14, // 8: cloudemu.worker.WorkerAgent.SaveState:input_type -> cloudemu.worker.SaveStateRequest
 	16, // 9: cloudemu.worker.WorkerAgent.LoadState:input_type -> cloudemu.worker.LoadStateRequest
-	1,  // 10: cloudemu.worker.WorkerAgent.StartGame:output_type -> cloudemu.worker.StartGameResponse
-	3,  // 11: cloudemu.worker.WorkerAgent.StopGame:output_type -> cloudemu.worker.StopGameResponse
-	5,  // 12: cloudemu.worker.WorkerAgent.SessionStatus:output_type -> cloudemu.worker.SessionStatusResponse
-	7,  // 13: cloudemu.worker.WorkerAgent.GeneratePlayerToken:output_type -> cloudemu.worker.GeneratePlayerTokenResponse
-	9,  // 14: cloudemu.worker.WorkerAgent.UpdatePortMapping:output_type -> cloudemu.worker.UpdatePortMappingResponse
-	11, // 15: cloudemu.worker.WorkerAgent.PauseGame:output_type -> cloudemu.worker.PauseGameResponse
-	13, // 16: cloudemu.worker.WorkerAgent.ResumeGame:output_type -> cloudemu.worker.ResumeGameResponse
-	15, // 17: cloudemu.worker.WorkerAgent.SaveState:output_type -> cloudemu.worker.SaveStateResponse
-	17, // 18: cloudemu.worker.WorkerAgent.LoadState:output_type -> cloudemu.worker.LoadStateResponse
-	10, // [10:19] is the sub-list for method output_type
-	1,  // [1:10] is the sub-list for method input_type
+	18, // 10: cloudemu.worker.WorkerAgent.SwitchRom:input_type -> cloudemu.worker.SwitchRomRequest
+	1,  // 11: cloudemu.worker.WorkerAgent.StartGame:output_type -> cloudemu.worker.StartGameResponse
+	3,  // 12: cloudemu.worker.WorkerAgent.StopGame:output_type -> cloudemu.worker.StopGameResponse
+	5,  // 13: cloudemu.worker.WorkerAgent.SessionStatus:output_type -> cloudemu.worker.SessionStatusResponse
+	7,  // 14: cloudemu.worker.WorkerAgent.GeneratePlayerToken:output_type -> cloudemu.worker.GeneratePlayerTokenResponse
+	9,  // 15: cloudemu.worker.WorkerAgent.UpdatePortMapping:output_type -> cloudemu.worker.UpdatePortMappingResponse
+	11, // 16: cloudemu.worker.WorkerAgent.PauseGame:output_type -> cloudemu.worker.PauseGameResponse
+	13, // 17: cloudemu.worker.WorkerAgent.ResumeGame:output_type -> cloudemu.worker.ResumeGameResponse
+	15, // 18: cloudemu.worker.WorkerAgent.SaveState:output_type -> cloudemu.worker.SaveStateResponse
+	17, // 19: cloudemu.worker.WorkerAgent.LoadState:output_type -> cloudemu.worker.LoadStateResponse
+	19, // 20: cloudemu.worker.WorkerAgent.SwitchRom:output_type -> cloudemu.worker.SwitchRomResponse
+	11, // [11:21] is the sub-list for method output_type
+	1,  // [1:11] is the sub-list for method input_type
 	1,  // [1:1] is the sub-list for extension type_name
 	1,  // [1:1] is the sub-list for extension extendee
 	0,  // [0:1] is the sub-list for field type_name
@@ -1068,7 +1185,7 @@ func file_proto_worker_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_worker_proto_rawDesc), len(file_proto_worker_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

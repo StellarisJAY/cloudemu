@@ -8,11 +8,14 @@ import type { EmulatorType, FriendWithUser } from '@/types/api'
 
 const props = defineProps<{
   show: boolean
+  prefillTitle?: string
+  prefillEmulatorType?: EmulatorType | null
+  prefillRomId?: string | null
 }>()
 
 const emit = defineEmits<{
   close: []
-  created: []
+  created: [roomId: string]
 }>()
 
 const message = useMessage()
@@ -26,7 +29,9 @@ const maxPorts = ref(4)
 const selectedFriendIds = ref<string[]>([])
 const submitting = ref(false)
 
-// 弹窗打开时确保用户信息和好友列表已加载
+const emulatorLocked = computed(() => props.prefillEmulatorType != null)
+
+// 弹窗打开时确保用户信息和好友列表已加载，并应用预填值
 watch(
   () => props.show,
   async (val) => {
@@ -36,6 +41,11 @@ watch(
     }
     if (friendStore.friends.length === 0) {
       await friendStore.fetchFriends()
+    }
+    // 应用预填值
+    title.value = props.prefillTitle || ''
+    if (props.prefillEmulatorType) {
+      emulatorType.value = props.prefillEmulatorType
     }
   },
 )
@@ -57,10 +67,6 @@ function displayName(f: { username: string; nickname: string | null }): string {
   return f.nickname || f.username
 }
 
-/**
- * 获取好友的实际用户ID
- * friend_id 和 user_id 中有一个是当前用户，返回另一个（即好友的真实用户ID）
- */
 function friendUserId(f: FriendWithUser): string {
   const currentId = authStore.user?.id
   if (currentId && f.user_id === currentId) return f.friend_id
@@ -81,21 +87,22 @@ async function handleSubmit() {
   }
 
   submitting.value = true
-  const err = await roomStore.createRoom({
+  const result = await roomStore.createRoom({
     title: title.value.trim(),
     emulator_type: emulatorType.value,
     max_ports: maxPorts.value,
+    rom_id: props.prefillRomId || undefined,
     invitee_ids: selectedFriendIds.value.length > 0 ? selectedFriendIds.value : undefined,
   })
   submitting.value = false
 
-  if (err) {
-    message.error(err)
+  if (typeof result === 'string') {
+    message.error(result)
     return
   }
 
   message.success('房间创建成功')
-  emit('created')
+  emit('created', result.id)
   resetForm()
 }
 
@@ -127,7 +134,11 @@ function resetForm() {
       </n-form-item>
 
       <n-form-item label="模拟器类型" required>
-        <n-select v-model:value="emulatorType" :options="emulatorOptions" />
+        <n-select
+          v-model:value="emulatorType"
+          :options="emulatorOptions"
+          :disabled="emulatorLocked"
+        />
       </n-form-item>
 
       <n-form-item label="最大玩家数" required>

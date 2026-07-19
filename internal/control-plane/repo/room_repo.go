@@ -76,6 +76,15 @@ func (r *RoomRepo) UpdateRomID(ctx context.Context, id uuid.UUID, romID *uuid.UU
 	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Update("rom_id", romID).Error
 }
 
+// ActiveByRomID 查询使用指定 ROM 的所有非关闭房间
+func (r *RoomRepo) ActiveByRomID(ctx context.Context, romID uuid.UUID) ([]model.Room, error) {
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).
+		Where("rom_id = ? AND status != 2", romID).
+		Find(&rooms).Error
+	return rooms, err
+}
+
 // RoomPlayerRepo 房间座位表数据访问层
 type RoomPlayerRepo struct {
 	db *gorm.DB

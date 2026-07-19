@@ -53,11 +53,29 @@ export const useRomStore = defineStore('rom', () => {
     }
   }
 
+  async function deleteRom(id: string): Promise<string | null> {
+    try {
+      const res = await romApi.deleteRom(id)
+      if (res.data.code !== 0) {
+        return res.data.message || '删除失败'
+      }
+      await fetchRoms()
+      return null
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const err = e as { response?: { data?: { message?: string } } }
+        return err.response?.data?.message || '网络错误，删除失败'
+      }
+      return '网络错误，删除失败'
+    }
+  }
+
   return {
     roms,
     loading,
     fetchRoms,
     uploadRom,
     updateRom,
+    deleteRom,
   }
 })

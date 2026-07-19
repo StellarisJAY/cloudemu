@@ -240,20 +240,40 @@ async function handleSelectRom(romId: string) {
   message.success(`已选择 ${currentRom.value?.title ?? romId}`)
 }
 
+async function handleSwitchRom(romId: string) {
+  if (buttonLoading.value) return
+  buttonLoading.value = 'switch'
+  try {
+    const err = await roomStore.switchRom({ room_id: roomId, rom_id: romId })
+    if (err) {
+      message.error(err)
+      return
+    }
+    currentRomId.value = romId
+    message.success(`已切换至 ${currentRom.value?.title ?? romId}`)
+  } finally {
+    buttonLoading.value = null
+  }
+}
+
 async function handleStartGame() {
   if (buttonLoading.value) return
   buttonLoading.value = 'start'
+  emulatorState.value = 'loading'
   try {
     const resp = await roomStore.startGame(roomId)
     if (!resp) {
+      emulatorState.value = 'idle'
       message.error('开始游戏失败：未收到服务器响应')
       return
     }
+    await roomStore.fetchRooms()
     livekitToken.value = resp.livekit_token
     livekitRoom.value = resp.livekit_room
     livekitUrl.value = resp.livekit_url
     await livekit.connect(resp.livekit_url, resp.livekit_token)
   } catch (e: unknown) {
+    emulatorState.value = 'idle'
     const msg = e instanceof Error ? e.message : '开始游戏失败'
     message.error(msg)
   } finally {
@@ -336,7 +356,7 @@ function handleLoadState() {
 }
 
 /** 按钮操作的加载状态，防止重复点击并为按钮提供 loading 动画 */
-type ControlAction = 'start' | 'pause' | 'resume' | 'stop' | 'saveState' | 'loadLatestState' | null
+type ControlAction = 'start' | 'pause' | 'resume' | 'stop' | 'saveState' | 'loadLatestState' | 'switch' | null
 const buttonLoading = ref<ControlAction>(null)
 
 async function handleLoadLatestState() {
@@ -446,6 +466,7 @@ function handleLeave() {
           :latency-ms="latencyMs"
           :button-loading="buttonLoading"
           @select-rom="handleSelectRom"
+          @switch-rom="handleSwitchRom"
           @start-game="handleStartGame"
           @pause="handlePause"
           @resume="handleResume"
@@ -530,6 +551,7 @@ function handleLeave() {
             :latency-ms="latencyMs"
             :button-loading="buttonLoading"
             @select-rom="handleSelectRom"
+            @switch-rom="handleSwitchRom"
             @start-game="handleStartGame"
             @pause="handlePause"
             @resume="handleResume"

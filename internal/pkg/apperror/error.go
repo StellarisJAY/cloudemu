@@ -58,7 +58,7 @@ var (
 	ErrLoadStateFailed    = &AppError{2019, "读档失败", 500}
 )
 
-// ---- ROM 模块错误 (3001-3005) ----
+// ---- ROM 模块错误 (3001-3006) ----
 var (
 	ErrRomNotExist      = &AppError{3001, "ROM 不存在", 404}
 	ErrRomDuplicate     = &AppError{3002, "该 ROM 文件已上传", 409}
@@ -66,6 +66,11 @@ var (
 	ErrRomInvalidFormat = &AppError{3004, "ROM 文件格式不正确", 400}
 	ErrRomTypeMismatch  = &AppError{3005, "ROM 模拟器类型与房间不匹配", 400}
 )
+
+// ErrRomInUse 返回 ROM 被活跃房间使用的错误，roomTitles 是使用该 ROM 的房间名称列表（用"、"连接）
+func ErrRomInUse(roomTitles string) *AppError {
+	return &AppError{3006, "ROM 正在被以下房间使用，请先处理这些房间: " + roomTitles, 409}
+}
 
 // ---- 好友模块错误 (4001-4004) ----
 var (

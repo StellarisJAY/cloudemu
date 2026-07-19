@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
+import { useMessage, useDialog } from 'naive-ui'
 import { useMediaQuery } from '@vueuse/core'
 import { useAuthStore } from '@/stores/auth'
 import { useRoomStore } from '@/stores/room'
@@ -12,8 +12,9 @@ import CreateRoomDialog from '@/components/room/CreateRoomDialog.vue'
 import RomList from '@/components/rom/RomList.vue'
 import RomUploadDialog from '@/components/rom/RomUploadDialog.vue'
 import RomEditDialog from '@/components/rom/RomEditDialog.vue'
+import RomDetailDialog from '@/components/rom/RomDetailDialog.vue'
 import MobileLobby from '@/components/lobby/MobileLobby.vue'
-import type { Rom } from '@/types/api'
+import type { Rom, EmulatorType } from '@/types/api'
 
 // 竖屏移动端：房间/ROM/好友需拆分为独立页面，用 MobileLobby 承载
 const isMobile = useMediaQuery('(pointer: coarse) and (max-width: 768px)')
@@ -23,11 +24,21 @@ const roomStore = useRoomStore()
 const romStore = useRomStore()
 const router = useRouter()
 const message = useMessage()
+const dialog = useDialog()
 
 const showCreateRoom = ref(false)
 const showUploadRom = ref(false)
 const showEditRom = ref(false)
 const editingRom = ref<Rom | null>(null)
+const showRomDetail = ref(false)
+const detailRom = ref<Rom | null>(null)
+
+// 创建房间预填值（从 ROM 卡片"开始游戏"触发）
+const createRoomPrefill = ref<{
+  title: string
+  emulatorType: EmulatorType
+  romId: string
+} | null>(null)
 
 const showDeleteConfirm = ref(false)
 const pendingDeleteRoomId = ref<string | null>(null)
@@ -43,6 +54,23 @@ const showLeaveConfirm = ref(false)
 const pendingLeaveRoomId = ref<string | null>(null)
 
 const leavingRoom = computed(() => roomStore.rooms.find((r) => r.id === pendingLeaveRoomId.value))
+
+// ---- ROM 删除确认 ----
+const showRomDeleteConfirm = ref(false)
+const pendingDeleteRom = ref<Rom | null>(null)
+
+async function confirmRomDelete() {
+  if (!pendingDeleteRom.value) return
+  const err = await romStore.deleteRom(pendingDeleteRom.value.id)
+  showRomDeleteConfirm.value = false
+  pendingDeleteRom.value = null
+  if (err) {
+    message.error(err)
+  } else {
+    message.success('ROM 已删除')
+    await romStore.fetchRoms()
+  }
+}
 
 function handleRoomDelete(roomId: string) {
   pendingDeleteRoomId.value = roomId
@@ -110,12 +138,30 @@ function handleRoomClick(roomId: string) {
   router.push(`/play/${roomId}`)
 }
 
-function handleRomClick(romId: string) {
-  const rom = romStore.roms.find((r) => r.id === romId)
-  if (rom && !rom.is_builtin) {
-    editingRom.value = rom
-    showEditRom.value = true
+// ---- ROM 卡片事件处理 ----
+
+function handleRomEdit(rom: Rom) {
+  editingRom.value = rom
+  showEditRom.value = true
+}
+
+function handleRomDelete(rom: Rom) {
+  pendingDeleteRom.value = rom
+  showRomDeleteConfirm.value = true
+}
+
+function handleRomDetail(rom: Rom) {
+  detailRom.value = rom
+  showRomDetail.value = true
+}
+
+function handleStartWithRom(rom: Rom) {
+  createRoomPrefill.value = {
+    title: rom.title,
+    emulatorType: rom.emulator_type,
+    romId: rom.id,
   }
+  showCreateRoom.value = true
 }
 
 function handleRomEditClose() {
@@ -126,6 +172,22 @@ function handleRomEditClose() {
 function handleRomEdited() {
   showEditRom.value = false
   editingRom.value = null
+}
+
+function handleRomDetailClose() {
+  showRomDetail.value = false
+  detailRom.value = null
+}
+
+function handleCreateRoomCreated(roomId: string) {
+  showCreateRoom.value = false
+  createRoomPrefill.value = null
+  router.push(`/play/${roomId}`)
+}
+
+function handleCreateRoomClose() {
+  showCreateRoom.value = false
+  createRoomPrefill.value = null
 }
 </script>
 
@@ -144,7 +206,10 @@ function handleRomEdited() {
     @room-stop="handleRoomStop"
     @room-leave="handleRoomLeave"
     @upload="showUploadRom = true"
-    @rom-click="handleRomClick"
+    @edit-rom="handleRomEdit"
+    @delete-rom="handleRomDelete"
+    @detail-rom="handleRomDetail"
+    @start-with-rom="handleStartWithRom"
   />
 
   <!-- 桌面端：三栏布局 -->
@@ -198,7 +263,10 @@ function handleRomEdited() {
             :roms="romStore.roms"
             :loading="romStore.loading"
             @upload="showUploadRom = true"
-            @rom-click="handleRomClick"
+            @edit-rom="handleRomEdit"
+            @delete-rom="handleRomDelete"
+            @detail-rom="handleRomDetail"
+            @start-with-rom="handleStartWithRom"
           />
         </div>
       </main>
@@ -207,93 +275,125 @@ function handleRomEdited() {
 
   <!-- 弹窗（桌面/移动端共用） -->
   <CreateRoomDialog
-      :show="showCreateRoom"
-      @close="showCreateRoom = false"
-      @created="showCreateRoom = false"
-    />
-    <RomUploadDialog
-      :show="showUploadRom"
-      @close="showUploadRom = false"
-      @uploaded="showUploadRom = false"
-    />
-    <RomEditDialog
-      :show="showEditRom"
-      :rom="editingRom"
-      @close="handleRomEditClose"
-      @updated="handleRomEdited"
-    />
+    :show="showCreateRoom"
+    :prefill-title="createRoomPrefill?.title"
+    :prefill-emulator-type="createRoomPrefill?.emulatorType ?? null"
+    :prefill-rom-id="createRoomPrefill?.romId ?? null"
+    @close="handleCreateRoomClose"
+    @created="handleCreateRoomCreated"
+  />
+  <RomUploadDialog
+    :show="showUploadRom"
+    @close="showUploadRom = false"
+    @uploaded="showUploadRom = false"
+  />
+  <RomEditDialog
+    :show="showEditRom"
+    :rom="editingRom"
+    @close="handleRomEditClose"
+    @updated="handleRomEdited"
+  />
+  <RomDetailDialog
+    :show="showRomDetail"
+    :rom="detailRom"
+    @close="handleRomDetailClose"
+  />
 
-    <!-- 删除房间确认 -->
-    <n-modal
-      v-model:show="showDeleteConfirm"
-      preset="dialog"
-      title="删除房间"
-      positive-text="确认删除"
-      negative-text="取消"
-      type="warning"
-      @positive-click="confirmDelete"
-      @negative-click="()=>{
-        showDeleteConfirm = false
-        pendingDeleteRoomId = null
-      }
-      "
-    >
-      <p>
-        确定要删除房间「<strong>{{ deletingRoom?.title }}</strong
-        >」吗？
-      </p>
-      <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
-        所有房间成员和关联数据都将被永久删除，且无法恢复。
-      </p>
-    </n-modal>
+  <!-- 删除房间确认 -->
+  <n-modal
+    v-model:show="showDeleteConfirm"
+    preset="dialog"
+    title="删除房间"
+    positive-text="确认删除"
+    negative-text="取消"
+    type="warning"
+    @positive-click="confirmDelete"
+    @negative-click="()=>{
+      showDeleteConfirm = false
+      pendingDeleteRoomId = null
+    }
+    "
+  >
+    <p>
+      确定要删除房间「<strong>{{ deletingRoom?.title }}</strong
+      >」吗？
+    </p>
+    <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
+      所有房间成员和关联数据都将被永久删除，且无法恢复。
+    </p>
+  </n-modal>
 
-    <!-- 停止游戏确认 -->
-    <n-modal
-      v-model:show="showStopConfirm"
-      preset="dialog"
-      title="停止游戏"
-      positive-text="确认停止"
-      negative-text="取消"
-      type="warning"
-      @positive-click="confirmStop"
-      @negative-click="()=>{
-        showStopConfirm = false
-        pendingStopRoomId = null
-      }
-      "
-    >
-      <p>
-        确定要停止房间「<strong>{{ stoppingRoom?.title }}</strong
-        >」的游戏吗？
-      </p>
-      <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
-        游戏将立即结束，所有玩家的游戏进度将丢失。
-      </p>
-    </n-modal>
+  <!-- 停止游戏确认 -->
+  <n-modal
+    v-model:show="showStopConfirm"
+    preset="dialog"
+    title="停止游戏"
+    positive-text="确认停止"
+    negative-text="取消"
+    type="warning"
+    @positive-click="confirmStop"
+    @negative-click="()=>{
+      showStopConfirm = false
+      pendingStopRoomId = null
+    }
+    "
+  >
+    <p>
+      确定要停止房间「<strong>{{ stoppingRoom?.title }}</strong
+      >」的游戏吗？
+    </p>
+    <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
+      游戏将立即结束，所有玩家的游戏进度将丢失。
+    </p>
+  </n-modal>
 
-    <!-- 退出房间确认 -->
-    <n-modal
-      v-model:show="showLeaveConfirm"
-      preset="dialog"
-      title="退出房间"
-      positive-text="确认退出"
-      negative-text="取消"
-      type="warning"
-      @positive-click="confirmLeave"
-      @negative-click="()=>{
-        showLeaveConfirm = false
-        pendingLeaveRoomId = null
-      }
-      "
-    >
-      <p>
-        确定要退出房间「<strong>{{ leavingRoom?.title }}</strong
-        >」吗？
-      </p>
-      <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
-        你将退出此房间，如果当前正在游戏中，你的游戏画面将断开。
-      </p>
-    </n-modal>
+  <!-- 退出房间确认 -->
+  <n-modal
+    v-model:show="showLeaveConfirm"
+    preset="dialog"
+    title="退出房间"
+    positive-text="确认退出"
+    negative-text="取消"
+    type="warning"
+    @positive-click="confirmLeave"
+    @negative-click="()=>{
+      showLeaveConfirm = false
+      pendingLeaveRoomId = null
+    }
+    "
+  >
+    <p>
+      确定要退出房间「<strong>{{ leavingRoom?.title }}</strong
+      >」吗？
+    </p>
+    <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
+      你将退出此房间，如果当前正在游戏中，你的游戏画面将断开。
+    </p>
+  </n-modal>
+
+  <!-- 删除 ROM 确认 -->
+  <n-modal
+    v-model:show="showRomDeleteConfirm"
+    preset="dialog"
+    title="删除 ROM"
+    positive-text="确认删除"
+    negative-text="取消"
+    type="warning"
+    @positive-click="confirmRomDelete"
+    @negative-click="()=>{
+      showRomDeleteConfirm = false
+      pendingDeleteRom = null
+    }
+    "
+  >
+    <p>
+      确定要删除 ROM「<strong>{{ pendingDeleteRom?.title }}</strong
+      >」吗？
+    </p>
+    <p style="color: var(--color-text-secondary); font-size: var(--font-size-small)">
+      ROM 文件及其封面将被永久删除，且无法恢复。如有房间正在使用该 ROM，删除将被拒绝。
+    </p>
+  </n-modal>
 </template>
 
 <style scoped>

@@ -258,6 +258,31 @@ func (c *WorkerClient) LoadState(ctx context.Context, workerAddr string, roomID,
 	return nil
 }
 
+// SwitchRom 通知 Worker 热切换 ROM：下载新 ROM 并令 EmuRunner 重新加载
+func (c *WorkerClient) SwitchRom(ctx context.Context, workerAddr string, roomID, romID uuid.UUID, romURL, emulatorType string) error {
+	_, client, err := c.getConn(workerAddr)
+	if err != nil {
+		slog.Error("get grpc conn failed for SwitchRom", "worker", workerAddr, "error", err)
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	_, err = client.SwitchRom(ctx, &workerpb.SwitchRomRequest{
+		RoomId:       roomID.String(),
+		RomUrl:       romURL,
+		RomId:        romID.String(),
+		EmulatorType: emulatorType,
+	})
+	if err != nil {
+		slog.Warn("worker SwitchRom gRPC failed", "worker", workerAddr, "room_id", roomID, "error", err)
+		return fmt.Errorf("worker SwitchRom: %w", err)
+	}
+
+	return nil
+}
+
 // Close 关闭所有 gRPC 连接
 func (c *WorkerClient) Close() {
 	c.mu.Lock()

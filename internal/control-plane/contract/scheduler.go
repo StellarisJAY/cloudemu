@@ -72,4 +72,6 @@ type WorkerClient interface {
 	SaveState(ctx context.Context, workerAddr string, roomID, saveStateID uuid.UUID, uploadURL string) (int64, error)
 	// LoadState 通知 Worker 读取存档：下载状态二进制并令 EmuRunner 反序列化（downloadURL 为预签名 GET URL）
 	LoadState(ctx context.Context, workerAddr string, roomID, saveStateID uuid.UUID, downloadURL string) error
+	// SwitchRom 通知 Worker 热切换 ROM：下载新 ROM 并令 EmuRunner 重新加载
+	SwitchRom(ctx context.Context, workerAddr string, roomID, romID uuid.UUID, romURL, emulatorType string) error
 }

@@ -20,14 +20,16 @@ import (
 // RomService ROM 管理业务逻辑实现
 type RomService struct {
 	romRepo     contract.RomRepo
+	roomRepo    contract.RoomRepo
 	minioFunc   contract.MinioFunc
 	minioBucket string
 }
 
 // NewRomService 创建 RomService 实例
-func NewRomService(romRepo contract.RomRepo, minioFunc contract.MinioFunc, minioBucket string) *RomService {
+func NewRomService(romRepo contract.RomRepo, roomRepo contract.RoomRepo, minioFunc contract.MinioFunc, minioBucket string) *RomService {
 	return &RomService{
 		romRepo:     romRepo,
+		roomRepo:    roomRepo,
 		minioFunc:   minioFunc,
 		minioBucket: minioBucket,
 	}
@@ -269,6 +271,48 @@ func (s *RomService) DeleteBuiltin(ctx context.Context, romID uuid.UUID) error {
 
 	if err := s.romRepo.Delete(ctx, romID); err != nil {
 		slog.Error("delete builtin rom error", "error", err)
+		return apperror.ErrInternal
+	}
+	return nil
+}
+
+// Delete 用户删除自有 ROM
+// 流程：校验 ROM 存在且为本人上传的非内置 ROM → 检查是否有活跃房间正在使用 → 删除 MinIO ROM 文件与封面 → 删除 DB 记录
+// MinIO 文件删除失败仅告警不阻断 DB 删除
+func (s *RomService) Delete(ctx context.Context, userID uuid.UUID, romID uuid.UUID) error {
+	rom, err := s.romRepo.ByID(ctx, romID)
+	if err != nil {
+		return apperror.ErrInternal
+	}
+	if rom == nil || rom.IsBuiltin || rom.UploaderID != userID {
+		return apperror.ErrRomNotExist
+	}
+
+	// 检查是否有活跃房间正在使用该 ROM
+	activeRooms, err := s.roomRepo.ActiveByRomID(ctx, romID)
+	if err != nil {
+		slog.Error("query active rooms by rom_id error", "error", err, "rom_id", romID)
+		return apperror.ErrInternal
+	}
+	if len(activeRooms) > 0 {
+		titles := make([]string, len(activeRooms))
+		for i, r := range activeRooms {
+			titles[i] = r.Title
+		}
+		return apperror.ErrRomInUse(strings.Join(titles, "、"))
+	}
+
+	if err := s.minioFunc.RemoveFile(ctx, s.minioBucket, rom.MinioPath); err != nil {
+		slog.Warn("remove rom file failed", "error", err, "path", rom.MinioPath)
+	}
+	if rom.CoverPath != nil {
+		if err := s.minioFunc.RemoveFile(ctx, s.minioBucket, *rom.CoverPath); err != nil {
+			slog.Warn("remove rom cover failed", "error", err, "path", *rom.CoverPath)
+		}
+	}
+
+	if err := s.romRepo.Delete(ctx, romID); err != nil {
+		slog.Error("delete rom error", "error", err)
 		return apperror.ErrInternal
 	}
 	return nil
